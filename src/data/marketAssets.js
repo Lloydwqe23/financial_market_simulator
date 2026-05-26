@@ -1,0 +1,38 @@
+export const FALLBACK_ASSETS = [
+  {
+    id: 'bitcoin',
+    symbol: 'btc',
+    name: 'Bitcoin',
+    type: 'crypto',
+    price: 68200,
+    change24h: 2.14,
+    marketCapRank: 1,
+  },
+  {
+    id: 'ethereum',
+    symbol: 'eth',
+    name: 'Ethereum',
+    type: 'crypto',
+    price: 3520,
+    change24h: 1.02,
+    marketCapRank: 2,
+  },
+  {
+    id: 'solana',
+    symbol: 'sol',
+    name: 'Solana',
+    type: 'crypto',
+    price: 162,
+    change24h: 4.37,
+    marketCapRank: 5,
+  },
+  {
+    id: 'cardano',
+    symbol: 'ada',
+    name: 'Cardano',
+    type: 'crypto',
+    price: 0.44,
+    change24h: -0.62,
+    marketCapRank: 10,
+  },
+];

@@ -1,0 +1,22 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: market-simulator-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: market_simulator
+      MYSQL_USER: market
+      MYSQL_PASSWORD: marketpass
+      MYSQL_ROOT_PASSWORD: rootpass
+    volumes:
+      - market_simulator_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prootpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  market_simulator_mysql_data:
