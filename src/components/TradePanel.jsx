@@ -39,7 +39,7 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
 
   // ── CENTRALIZED EXECUTION PIPELINE ──
   const handleTradeSubmit = (event, actionType) => {
-    event.preventDefault(); // Stop standard browser form routing completely
+    event.preventDefault(); // Stop standard form submission
     
     if (!authUser) {
       navigate('/login');
@@ -47,11 +47,11 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
     }
 
     if (instrumentType === 'stock') {
-      // Spot trades take (amount, instrumentType)
-      if (actionType === 'buy') onBuy(amountNumber, 'stock');
-      if (actionType === 'sell') onSell(amountNumber, 'stock');
+      // FIX: Pass empty options object ({}) as the 3rd parameter so the store doesn't crash reading 'undefined'
+      if (actionType === 'buy') onBuy(amountNumber, 'stock', {});
+      if (actionType === 'sell') onSell(amountNumber, 'stock', {});
     } else {
-      // Futures trades take (amount, instrumentType, optionsPayload)
+      // Futures trades pass the full options payload
       onBuy(amountNumber, 'futures', {
         direction,
         leverage,

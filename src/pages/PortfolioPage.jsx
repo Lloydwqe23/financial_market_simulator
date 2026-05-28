@@ -9,13 +9,20 @@ function PortfolioPage() {
   // Filter selection: 'all' | 'crypto' | 'stock' | 'currency'
   const [activeCategory, setActiveCategory] = useState('all');
 
-  const portfolioValue = useMemo(
-    () => holdings.reduce((sum, item) => sum + item.quantity * item.currentPrice, 0),
-    [holdings],
-  );
+  // Dynamically calculate portfolio worth accounting for spot valuation + unrealized futures PnL
+  const portfolioValue = useMemo(() => {
+    return holdings.reduce((sum, item) => {
+      if (item.instrumentType !== 'futures') {
+        return sum + item.quantity * item.currentPrice;
+      }
+      // For futures, portfolio equity value is its initial collateral margin plus its current unrealized PnL
+      const pnl = item.unrealizedPnL || 0;
+      return sum + item.margin + pnl;
+    }, 0);
+  }, [holdings]);
 
   const investedValue = useMemo(
-    () => holdings.reduce((sum, item) => sum + item.quantity * item.averagePrice, 0),
+    () => holdings.reduce((sum, item) => sum + (item.margin || item.quantity * item.averagePrice), 0),
     [holdings],
   );
 
@@ -30,11 +37,9 @@ function PortfolioPage() {
     };
 
     holdings.forEach((holding) => {
-      // Normalizing variations in asset type fields
       let cat = holding.type === 'stocks' ? 'stock' : holding.type;
       if (!categories[cat]) categories[cat] = { stock: [], futures: [] };
 
-      // Map either to standard or futures bucket
       const instType = holding.instrumentType === 'futures' ? 'futures' : 'stock';
       categories[cat][instType].push(holding);
     });
@@ -45,25 +50,75 @@ function PortfolioPage() {
   // Helper render method for handling sub-tables neatly
   const renderSubSection = (title, items) => {
     if (!items || items.length === 0) return null;
+    const isFuturesSection = title.toLowerCase().includes('futures');
+
     return (
       <div style={{ margin: '14px 0 24px 16px' }}>
         <h5 className="user-label" style={{ marginBottom: '10px', fontSize: '0.75rem', color: 'var(--accent)' }}>
           {title.toUpperCase()}
         </h5>
         <div className="section-list">
-          {items.map((holding) => (
-            <div className="list-item" key={`${holding.id}-${holding.instrumentType}`}>
-              <div>
-                <strong>
-                  {holding.name} ({holding.symbol.toUpperCase()})
-                </strong>
-                <small>
-                  Quantity: {holding.quantity} | Avg: ${holding.averagePrice.toFixed(2)} | Current: ${holding.currentPrice.toFixed(2)}
-                </small>
+          {items.map((holding) => {
+            const isFutures = holding.instrumentType === 'futures';
+            
+            // Calculate outputs dynamically based on instrument specifications
+            let displayPnL = 0;
+            let totalDisplayValue = 0;
+
+            if (isFutures) {
+              displayPnL = holding.unrealizedPnL || 0;
+              totalDisplayValue = holding.margin + displayPnL;
+            } else {
+              totalDisplayValue = holding.quantity * holding.currentPrice;
+              const costBasis = holding.quantity * holding.averagePrice;
+              displayPnL = totalDisplayValue - costBasis;
+            }
+
+            const pnlClass = displayPnL >= 0 ? 'positive' : 'negative';
+            const pnlSign = displayPnL >= 0 ? '+' : '';
+
+            return (
+              <div className="list-item" key={holding.id}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <strong>
+                      {holding.name} ({holding.symbol.toUpperCase()})
+                    </strong>
+                    {isFutures && (
+                      <span 
+                        className="auth-pill" 
+                        style={{ 
+                          fontSize: '0.65rem', 
+                          padding: '2px 8px',
+                          background: holding.direction === 'long' ? 'rgba(66, 211, 146, 0.16)' : 'rgba(255, 122, 122, 0.16)',
+                          color: holding.direction === 'long' ? 'var(--accent)' : 'var(--danger)',
+                          borderColor: holding.direction === 'long' ? 'rgba(66, 211, 146, 0.3)' : 'rgba(255, 122, 122, 0.3)',
+                          borderStyle: 'solid',
+                          borderWidth: '1px'
+                        }}
+                      >
+                        {holding.direction?.toUpperCase()} {holding.leverage}x
+                      </span>
+                    )}
+                  </div>
+                  <small style={{ marginTop: '4px', display: 'block' }}>
+                    {isFutures 
+                      ? `Contracts: ${holding.quantity} | Entry: $${holding.averagePrice.toFixed(2)} | Collateral Margin: $${holding.margin.toFixed(2)}`
+                      : `Quantity: ${holding.quantity} | Avg: $${holding.averagePrice.toFixed(2)}`
+                    }
+                    {` | Current: $${holding.currentPrice.toFixed(2)}`}
+                  </small>
+                </div>
+
+                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <strong>${totalDisplayValue.toFixed(2)}</strong>
+                  <span className={pnlClass} style={{ fontSize: '0.8rem', fontWeight: '600' }}>
+                    {pnlSign}${displayPnL.toFixed(2)} PnL
+                  </span>
+                </div>
               </div>
-              <strong>${(holding.quantity * holding.currentPrice).toFixed(2)}</strong>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -158,7 +213,7 @@ function PortfolioPage() {
         )}
 
         <div className="helper-box">
-          <strong>Total Initial Invested Value:</strong> ${investedValue.toFixed(2)}
+          <strong>Total Net Invested Capital Margin:</strong> ${investedValue.toFixed(2)}
         </div>
       </div>
 
@@ -168,24 +223,41 @@ function PortfolioPage() {
           <div className="empty-state">Transactions will appear after your first buy or sell.</div>
         ) : (
           <div className="section-list">
-            {transactions.map((transaction) => (
-              <div className="list-item" key={transaction.id}>
-                <div>
-                  <strong>
-                    {transaction.type === 'buy' ? 'Buy' : 'Sell'} {transaction.assetName}
-                    <span className="asset-meta" style={{ fontSize: '0.75rem', marginLeft: '6px' }}>
-                      ({transaction.instrumentType || 'stock'})
-                    </span>
+            {transactions.map((transaction) => {
+              let isOutflow = false;
+              let absoluteValue = Math.abs(transaction.total);
+
+              if (transaction.type === 'buy' || transaction.type === 'deposit') {
+                isOutflow = transaction.type === 'buy'; 
+              } else if (transaction.type === 'futures_close') {
+                isOutflow = transaction.total < 0;
+              }
+
+              const displaySign = isOutflow ? '-' : '+';
+              const displayClass = isOutflow ? 'negative' : 'positive';
+
+              return (
+                <div className="list-item" key={transaction.id}>
+                  <div>
+                    <strong>
+                      {transaction.type === 'buy' ? 'Buy' : transaction.type === 'sell' ? 'Sell' : 'Close'} {transaction.assetName}
+                      {transaction.instrumentType === 'futures' && (
+                        <span className="asset-meta" style={{ fontSize: '0.75rem', marginLeft: '6px' }}>
+                          (futures)
+                        </span>
+                      )}
+                    </strong>
+                    <small>
+                      {transaction.quantity} {transaction.symbol.toUpperCase()} • {transaction.time}
+                    </small>
+                  </div>
+                  
+                  <strong className={displayClass}>
+                    {displaySign}${absoluteValue.toFixed(2)}
                   </strong>
-                  <small>
-                    {transaction.quantity} {transaction.symbol.toUpperCase()} • {transaction.time}
-                  </small>
                 </div>
-                <strong className={transaction.type === 'buy' ? 'negative' : 'positive'}>
-                  {transaction.type === 'buy' ? '-' : '+'}${transaction.total.toFixed(2)}
-                </strong>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -274,12 +274,52 @@ function normalizeEmail(email) {
 }
 
 function normalizePortfolio(input) {
-  const balance = Number(input?.balance);
+  // If the incoming payload has a nested .portfolio key object, extract it safely
+  const target = input?.portfolio ? input.portfolio : input;
+
+  const balance = Number(target?.balance);
+  
+  const normalizedHoldings = Array.isArray(target?.holdings)
+    ? target.holdings.map((holding) => ({
+        id: String(holding?.id || ''),
+        symbol: String(holding?.symbol || ''),
+        name: String(holding?.name || ''),
+        quantity: Number(holding?.quantity || 0),
+        averagePrice: Number(holding?.averagePrice || 0),
+        currentPrice: Number(holding?.currentPrice || 0),
+        type: String(holding?.type || 'crypto'),
+        instrumentType: String(holding?.instrumentType || 'stock'),
+        
+        // Optional derivative contract parameters
+        direction: holding?.direction ? String(holding.direction) : null,
+        leverage: holding?.leverage ? Number(holding.leverage) : null,
+        margin: holding?.margin ? Number(holding.margin) : null,
+        stopLoss: holding?.stopLoss ? Number(holding.stopLoss) : null,
+        takeProfit: holding?.takeProfit ? Number(holding.takeProfit) : null,
+        liquidationPrice: holding?.liquidationPrice ? Number(holding.liquidationPrice) : null,
+        unrealizedPnL: holding?.unrealizedPnL ? Number(holding.unrealizedPnL) : 0,
+      }))
+    : [];
+
+  const normalizedTransactions = Array.isArray(target?.transactions)
+    ? target.transactions.map((tx) => ({
+        id: String(tx?.id || ''),
+        type: String(tx?.type || 'buy'),
+        assetName: String(tx?.assetName || ''),
+        symbol: String(tx?.symbol || ''),
+        quantity: Number(tx?.quantity || 0),
+        price: Number(tx?.price || 0),
+        total: Number(tx?.total || 0),
+        time: String(tx?.time || ''),
+        instrumentType: String(tx?.instrumentType || 'stock'),
+      }))
+    : [];
+
   return {
-    balance: Number.isFinite(balance) ? balance : DEFAULT_PORTFOLIO.balance,
-    holdings: Array.isArray(input?.holdings) ? input.holdings : [],
-    transactions: Array.isArray(input?.transactions) ? input.transactions : [],
-    lastMessage: typeof input?.lastMessage === 'string' ? input.lastMessage : DEFAULT_PORTFOLIO.lastMessage,
+    balance: Number.isFinite(balance) ? balance : 10000,
+    holdings: normalizedHoldings,
+    transactions: normalizedTransactions,
+    lastMessage: typeof target?.lastMessage === 'string' ? target.lastMessage : 'Portfolio updated.',
   };
 }
 

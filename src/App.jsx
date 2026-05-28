@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import CryptoPage from './pages/CryptoPage';
 import StocksPage from './pages/StocksPage';
@@ -10,6 +10,43 @@ import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
 import { usePortfolioStore } from './store/portfolioStore';
 import { useAuthStore } from './store/authStore';
+
+
+
+function ToastNotification() {
+  const lastMessage = usePortfolioStore((state) => state.lastMessage);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    // Prevent showing the initial welcome state string on mount
+    if (!lastMessage || lastMessage.includes('Start by buying')) return;
+
+    setVisible(true);
+    const timer = setTimeout(() => setVisible(false), 4500); // Auto-dismiss after 4.5s
+
+    return () => clearTimeout(timer);
+  }, [lastMessage]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="helper-box" style={{
+      position: 'fixed',
+      bottom: '24px',
+      right: '24px',
+      zIndex: 1000,
+      margin: 0,
+      boxShadow: 'var(--shadow)',
+      animation: 'authEnter 0.3s ease both',
+      background: lastMessage.includes('lost') ? 'rgba(255, 122, 122, 0.15)' : 'rgba(66, 211, 146, 0.15)',
+      borderColor: lastMessage.includes('lost') ? 'var(--danger)' : 'var(--accent)'
+    }}>
+      <strong style={{ display: 'block', marginBottom: '4px' }}>🔔 Market Alert</strong>
+      <span>{lastMessage}</span>
+    </div>
+  );
+}
+
 
 function App() {
   const balance = usePortfolioStore((state) => state.balance);

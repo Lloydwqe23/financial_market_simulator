@@ -216,6 +216,30 @@ function AssetDetailPage() {
   const sellAsset       = usePortfolioStore((s) => s.sellAsset);
   const syncMarketPrices = usePortfolioStore((s) => s.syncMarketPrices);
 
+  // ─── PLACE SNIPPET 1 HERE (STORE ACTION HOOK) ───
+  const updatePositionTriggers = usePortfolioStore((s) => s.updatePositionTriggers);
+
+  // ─── PLACE SNIPPET 2 HERE (LOCAL MODAL COMPONENT STATE) ───
+  const [editingPositionId, setEditingPositionId] = useState(null);
+  const [localSL, setLocalSL] = useState('');
+  const [localTP, setLocalTP] = useState('');
+
+  // ─── PLACE SNIPPET 3 HERE (THE CONTROLLER FUNCTIONS) ───
+  const handleOpenModifier = (holding) => {
+    setEditingPositionId(holding.id);
+    setLocalSL(holding.stopLoss ? String(holding.stopLoss) : '');
+    setLocalTP(holding.takeProfit ? String(holding.takeProfit) : '');
+  };
+
+  const handleSaveTriggers = (positionId) => {
+    updatePositionTriggers({
+      positionId,
+      stopLoss: localSL ? Number(localSL) : null,
+      takeProfit: localTP ? Number(localTP) : null
+    });
+    setEditingPositionId(null); // Close modification menu
+  };
+
   const [timeframe, setTimeframe]       = useState('15m');
   const tfConfig   = useMemo(() => getTimeframeConfig(timeframe), [timeframe]);
   const timeframeMs = tfConfig.ms;
@@ -324,6 +348,17 @@ function AssetDetailPage() {
     }
     return null;
   }, [assetId, assetType, cryptoAssets, currencyBase, currencyChanges, currencyRates, stockAssets, tick]);
+
+
+  const holdings = usePortfolioStore((state) => state.holdings);
+
+  const activeAssetHoldings = useMemo(() => {
+    return holdings.filter((item) => {
+      // FIX: Parse the prefix out of composite contract strings safely
+      const positionBaseId = item.assetId || item.id.split('-')[0];
+      return positionBaseId === assetId;
+    });
+  }, [holdings, assetId]);
 
   // ── History key (triggers reload when asset/TF/currency changes) ────────────
   const historyKey = useMemo(() => {
@@ -563,6 +598,156 @@ function AssetDetailPage() {
         </div>
 
         <CandleChart candles={candles} />
+      </div>
+      
+      <div className="surface">
+        <h3>Your Active {displayAsset?.name} Positions</h3>
+        {activeAssetHoldings.length === 0 ? (
+          <div className="empty-state">
+            You do not hold any active spot shares or open futures contracts for this asset.
+          </div>
+        ) : (
+          <div className="section-list">
+            {activeAssetHoldings.map((holding) => {
+              const isFutures = holding.instrumentType === 'futures';
+              const pnl = holding.unrealizedPnL || 0;
+              const isEditing = editingPositionId === holding.id;
+
+              return (
+                <div 
+                  key={holding.id}
+                  className="section-list"
+                  style={{ 
+                    background: 'rgba(255, 255, 255, 0.01)',
+                    padding: '12px',
+                    borderRadius: '16px',
+                    border: '1px solid var(--border)',
+                    marginBottom: '8px'
+                  }}
+                >
+                  <div 
+                    className="list-item" 
+                    style={{ 
+                      border: '0', 
+                      background: 'transparent', 
+                      padding: 0,
+                      borderLeft: `4px solid ${isFutures ? 'var(--auth-accent)' : 'var(--accent)'}`,
+                      paddingLeft: '12px'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <strong style={{ textTransform: 'uppercase' }}>
+                          {holding.symbol}
+                        </strong>
+                        <span className="auth-pill" style={{ fontSize: '0.65rem', padding: '2px 8px' }}>
+                          {isFutures ? `${holding.direction.toUpperCase()} ${holding.leverage}x FUTURES` : 'SPOT'}
+                        </span>
+                      </div>
+                      
+                      <small style={{ marginTop: '4px', display: 'block' }}>
+                        Size: {holding.quantity} | Avg Entry: ${holding.averagePrice.toFixed(2)}
+                      </small>
+                      
+                      {/* Live Risk trigger displays */}
+                      {isFutures && (
+                        <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <small style={{ color: 'var(--danger)' }}>
+                            ⚠️ Liquidation Price: ${holding.liquidationPrice?.toFixed(2)}
+                          </small>
+                          <small style={{ color: holding.takeProfit ? 'var(--accent)' : 'var(--muted)' }}>
+                            🎯 Take Profit Target: {holding.takeProfit ? `$${holding.takeProfit.toFixed(2)}` : 'None Configured'}
+                          </small>
+                          <small style={{ color: holding.stopLoss ? '#ff9e9e' : 'var(--muted)' }}>
+                            🛑 Stop Loss Safety: {holding.stopLoss ? `$${holding.stopLoss.toFixed(2)}` : 'None Configured'}
+                          </small>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {isFutures ? (
+                        <>
+                          <strong className={pnl >= 0 ? 'positive' : 'negative'}>
+                            {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                          </strong>
+                          <button 
+                            type="button" 
+                            className="tf-pill" 
+                            style={{ fontSize: '0.7rem', padding: '3px 8px', alignSelf: 'flex-end' }}
+                            onClick={() => handleOpenModifier(holding)}
+                          >
+                            ⚙️ Edit Limits
+                          </button>
+                        </>
+                      ) : (
+                        <strong>${(holding.quantity * holding.currentPrice).toFixed(2)}</strong>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Dynamic interactive inline modification tray menu */}
+                  {isFutures && isEditing && (
+                    <div 
+                      className="helper-box" 
+                      style={{ 
+                        marginTop: '12px', 
+                        background: 'rgba(2, 8, 20, 0.8)', 
+                        borderColor: 'var(--border)',
+                        display: 'grid',
+                        gap: '10px'
+                      }}
+                    >
+                      <strong style={{ fontSize: '0.85rem', color: 'var(--text)' }}>Modify Triggers for contract</strong>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <label style={{ flex: 1, fontSize: '0.8rem', display: 'grid', gap: '4px' }}>
+                          Take Profit Price ($)
+                          <input
+                            type="number"
+                            className="market-search-input"
+                            style={{ padding: '6px 10px', fontSize: '0.85rem' }}
+                            value={localTP}
+                            placeholder="Deactivate target"
+                            onChange={(e) => setLocalTP(e.target.value)}
+                          />
+                        </label>
+                        <label style={{ flex: 1, fontSize: '0.8rem', display: 'grid', gap: '4px' }}>
+                          Stop Loss Price ($)
+                          <input
+                            type="number"
+                            className="market-search-input"
+                            style={{ padding: '6px 10px', fontSize: '0.85rem' }}
+                            value={localSL}
+                            placeholder="Deactivate limits"
+                            onChange={(e) => setLocalSL(e.target.value)}
+                          />
+                        </label>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                        <button 
+                          type="button" 
+                          className="ghost-button" 
+                          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                          onClick={() => setEditingPositionId(null)}
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          type="button" 
+                          className="primary-button" 
+                          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                          onClick={() => handleSaveTriggers(holding.id)}
+                        >
+                          Save Changes
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <TradePanel
