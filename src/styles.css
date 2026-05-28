@@ -785,3 +785,79 @@ h1 {
   min-width: 4%;
   transition: left 0.05s linear, width 0.05s linear;
 }
+
+.deposit-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+ 
+.deposit-preset-btn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(66, 211, 146, 0.3);
+  background: rgba(66, 211, 146, 0.08);
+  color: var(--accent);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+ 
+.deposit-preset-btn:hover {
+  background: rgba(66, 211, 146, 0.18);
+  border-color: rgba(66, 211, 146, 0.6);
+  transform: translateY(-1px);
+}
+ 
+.deposit-preset-btn:active {
+  transform: translateY(0);
+}
+ 
+.deposit-custom {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+ 
+.deposit-input-wrap {
+  position: relative;
+  flex: 1;
+}
+ 
+.deposit-currency-sign {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-weight: 600;
+  pointer-events: none;
+}
+ 
+.deposit-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: rgba(2, 8, 20, 0.7);
+  color: var(--text);
+  padding: 12px 14px 12px 28px;
+  border-radius: 14px;
+  font: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+ 
+.deposit-input:focus {
+  outline: none;
+  border-color: rgba(66, 211, 146, 0.5);
+  box-shadow: 0 0 0 3px rgba(66, 211, 146, 0.12);
+}
+ 
+/* Hide number input spinners */
+.deposit-input::-webkit-outer-spin-button,
+.deposit-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+.deposit-input[type=number] {
+  -moz-appearance: textfield;
+}
