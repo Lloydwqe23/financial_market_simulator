@@ -9,6 +9,12 @@ function DashboardPage() {
   const [assets, setAssets] = useState(FALLBACK_ASSETS);
   const [selectedAssetId, setSelectedAssetId] = useState(FALLBACK_ASSETS[0].id);
   const [status, setStatus] = useState('Loading market...');
+  
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'crypto' | 'stock'
+  const [sortBy, setSortBy] = useState('none'); // 'none' | 'name' | 'changeHigh' | 'changeLow'
+
   const balance = usePortfolioStore((state) => state.balance);
   const buyAsset = usePortfolioStore((state) => state.buyAsset);
   const sellAsset = usePortfolioStore((state) => state.sellAsset);
@@ -21,10 +27,7 @@ function DashboardPage() {
     let requestInFlight = false;
 
     const loadAssets = async () => {
-      if (requestInFlight) {
-        return;
-      }
-
+      if (requestInFlight) return;
       requestInFlight = true;
 
       try {
@@ -60,13 +63,11 @@ function DashboardPage() {
 
         const liveAssets = [...cryptoAssets, ...stockAssets];
 
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
 
         setAssets(liveAssets);
         setSelectedAssetId((currentId) =>
-          liveAssets.some((asset) => asset.id === currentId) ? currentId : liveAssets[0].id,
+          liveAssets.some((asset) => asset.id === currentId) ? currentId : liveAssets[0]?.id || '',
         );
         syncMarketPrices(liveAssets);
         setStatus(`${sourceLabel.join(' • ')} • ${new Date().toLocaleTimeString('en-US')}`);
@@ -86,11 +87,43 @@ function DashboardPage() {
     };
   }, [syncMarketPrices]);
 
+  // Compute filtered and sorted assets dynamically
+  const filteredAssets = useMemo(() => {
+    let result = [...assets];
+
+    // 1. Text Search Filter
+    if (searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (asset) =>
+          asset.name.toLowerCase().includes(query) ||
+          asset.symbol.toLowerCase().includes(query)
+      );
+    }
+
+    // 2. Type Filter
+    if (typeFilter !== 'all') {
+      result = result.filter((asset) => asset.type === typeFilter);
+    }
+
+    // 3. Sorting Rules
+    if (sortBy === 'name') {
+      result.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'changeHigh') {
+      result.sort((a, b) => b.change24h - a.change24h);
+    } else if (sortBy === 'changeLow') {
+      result.sort((a, b) => a.change24h - b.change24h);
+    }
+
+    return result;
+  }, [assets, searchQuery, typeFilter, sortBy]);
+
   const selectedAsset = selectedAssetId
     ? assets.find((asset) => asset.id === selectedAssetId) ?? assets[0] ?? null
     : null;
 
   const marketSummary = useMemo(() => {
+    if (assets.length === 0) return '0.00';
     const averageChange = assets.reduce((sum, asset) => sum + asset.change24h, 0) / assets.length;
     return averageChange.toFixed(2);
   }, [assets]);
@@ -100,18 +133,72 @@ function DashboardPage() {
       <div className="surface">
         <div className="hero">
           <h2>Market dashboard</h2>
-          <p>
-            Live crypto and stock quotes updated every second through public APIs.
-          </p>
+          <p>Live crypto and stock quotes updated every second through public APIs.</p>
           <p className="asset-meta">Status: {status}</p>
           <p className="asset-meta">Average market change: {marketSummary}%</p>
           <p className="asset-meta">Assets tracked: {assets.length}</p>
         </div>
 
+        {/* Toolbar Controls */}
+        <div className="market-toolbar">
+          <div className="search-wrapper">
+            <input
+              type="text"
+              className="market-search-input"
+              placeholder="Search asset or ticker..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="filter-row-container">
+            {/* Type Filter using your beautiful active/inactive pill buttons */}
+            <div className="tf-row" style={{ marginBottom: 0 }}>
+              <button 
+                type="button"
+                className={`tf-pill ${typeFilter === 'all' ? 'tf-pill--active' : ''}`}
+                onClick={() => setTypeFilter('all')}
+              >
+                All Assets
+              </button>
+              <button 
+                type="button"
+                className={`tf-pill ${typeFilter === 'crypto' ? 'tf-pill--active' : ''}`}
+                onClick={() => setTypeFilter('crypto')}
+              >
+                Crypto
+              </button>
+              <button 
+                type="button"
+                className={`tf-pill ${typeFilter === 'stock' ? 'tf-pill--active' : ''}`}
+                onClick={() => setTypeFilter('stock')}
+              >
+                Stocks
+              </button>
+            </div>
+
+            {/* Dropdown sorting selector matches your native .chart-controls style */}
+            <select 
+              className="market-select"
+              value={sortBy} 
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="none">Sort By</option>
+              <option value="name">Name (A-Z)</option>
+              <option value="changeHigh">Top Gainers</option>
+              <option value="changeLow">Top Losers</option>
+            </select>
+          </div>
+        </div>
+
         <div className="grid-cards">
-          {assets.map((asset) => (
-            <AssetCard key={asset.id} asset={asset} onTrade={(assetItem) => setSelectedAssetId(assetItem.id)} />
-          ))}
+          {filteredAssets.length === 0 ? (
+            <div className="empty-state">No assets found matching your criteria.</div>
+          ) : (
+            filteredAssets.map((asset) => (
+              <AssetCard key={asset.id} asset={asset} onTrade={(assetItem) => setSelectedAssetId(assetItem.id)} />
+            ))
+          )}
         </div>
       </div>
 
@@ -120,8 +207,24 @@ function DashboardPage() {
           asset={selectedAsset}
           balance={balance}
           onClose={() => setSelectedAssetId('')}
-          onBuy={(amount) => buyAsset({ asset: selectedAsset, amount })}
-          onSell={(amount) => sellAsset({ asset: selectedAsset, amount })}
+          
+          // Update these two lines to pass all 3 parameters down to the Zustand store:
+          onBuy={(amount, type, options) => 
+            buyAsset({ 
+              asset: selectedAsset, 
+              amount, 
+              instrumentType: type, 
+              futuresOptions: options 
+            })
+          }
+          onSell={(amount, type, options) => 
+            sellAsset({ 
+              asset: selectedAsset, 
+              amount, 
+              instrumentType: type, 
+              futuresOptions: options 
+            })
+          }
         />
 
         <div className="surface">

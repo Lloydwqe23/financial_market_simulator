@@ -570,21 +570,41 @@ function AssetDetailPage() {
         balance={balanceInQuote}
         quoteCurrency={assetType === 'currency' ? quoteCurrency : ''}
         onClose={() => navigate(-1)}
-        onBuy={(amount) => {
+        
+        // ─── UPGRADED FUTURES-AWARE BUY HANDLER ───
+        onBuy={(amount, type, options) => {
           if (!displayAsset) return;
+          
+          let targetAsset = { ...displayAsset };
+          // Keep your special currency fallback parsing logic if applicable
           if (displayAsset.type === 'currency' && Number.isFinite(displayAsset.priceUsd)) {
-            buyAsset({ asset: { ...displayAsset, price: displayAsset.priceUsd }, amount });
-            return;
+            targetAsset.price = displayAsset.priceUsd;
           }
-          buyAsset({ asset: displayAsset, amount });
+          
+          // Pass all parameters to the store
+          buyAsset({ 
+            asset: targetAsset, 
+            amount, 
+            instrumentType: type, 
+            futuresOptions: options 
+          });
         }}
-        onSell={(amount) => {
+
+        // ─── UPGRADED FUTURES-AWARE SELL HANDLER ───
+        onSell={(amount, type, options) => {
           if (!displayAsset) return;
+          
+          let targetAsset = { ...displayAsset };
           if (displayAsset.type === 'currency' && Number.isFinite(displayAsset.priceUsd)) {
-            sellAsset({ asset: { ...displayAsset, price: displayAsset.priceUsd }, amount });
-            return;
+            targetAsset.price = displayAsset.priceUsd;
           }
-          sellAsset({ asset: displayAsset, amount });
+          
+          // Pass all parameters to the store
+          sellAsset({ 
+            asset: targetAsset, 
+            amount, 
+            instrumentType: type 
+          });
         }}
       />
     </section>

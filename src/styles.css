@@ -861,3 +861,66 @@ h1 {
 .deposit-input[type=number] {
   -moz-appearance: textfield;
 }
+
+/* ── Filter & Search Toolbar Styles ────────────────────────────────────────── */
+.market-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.market-search-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: rgba(2, 8, 20, 0.7);
+  color: var(--text);
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.market-search-input:focus {
+  outline: none;
+  border-color: rgba(66, 211, 146, 0.5);
+  box-shadow: 0 0 0 3px rgba(66, 211, 146, 0.12);
+}
+
+.filter-row-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Custom select styling matching your existing .chart-controls select */
+.market-select {
+  border: 1px solid var(--border);
+  background: rgba(2, 8, 20, 0.7);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.market-select:focus {
+  outline: none;
+  border-color: rgba(66, 211, 146, 0.4);
+}
+
+@media (max-width: 640px) {
+  .filter-row-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+}

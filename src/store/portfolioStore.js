@@ -6,7 +6,7 @@ const usePortfolioStore = create((set, get) => ({
   transactions: [],
   lastMessage: 'Start by buying your first asset on the dashboard.',
 
-  // ── Deposit ───────────────────────────────────────────────────────────────
+  // ── DEPOSIT FUNDS ────────────────────────────────────────────────────────
   deposit: (amount) => {
     const n = Number(amount);
     if (!Number.isFinite(n) || n <= 0) return { ok: false };
@@ -23,12 +23,14 @@ const usePortfolioStore = create((set, get) => ({
           price: 1,
           total: n,
           time: new Date().toLocaleString('en-US'),
+          instrumentType: 'spot',
         },
         ...state.transactions,
       ],
       lastMessage: `Deposited $${n.toLocaleString('en-US', { minimumFractionDigits: 2 })} to your account.`,
     }));
 
+    // Async server syncing persistence framework
     setTimeout(async () => {
       try {
         await fetch('/api/portfolio', {
@@ -43,15 +45,15 @@ const usePortfolioStore = create((set, get) => ({
           }),
         });
       } catch (e) {
-        // ignore
+        // Ignore background network dropouts
       }
     }, 0);
 
     return { ok: true };
   },
 
-  // ── Buy ───────────────────────────────────────────────────────────────────
-  buyAsset: ({ asset, amount }) => {
+  // ── OPEN ASSET OR FUTURE POSITION (BUY) ──────────────────────────────────
+  buyAsset: ({ asset, amount, instrumentType = 'stock', futuresOptions = null }) => {
     const quantity = Number(amount);
     if (!asset || !Number.isFinite(quantity) || quantity <= 0) {
       set({ lastMessage: 'Enter a valid amount.' });
@@ -64,43 +66,77 @@ const usePortfolioStore = create((set, get) => ({
       return { ok: false };
     }
 
-    const totalCost = quantity * assetPrice;
-    const currentBalance = get().balance;
+    const totalSize = quantity * assetPrice;
+    
+    // Futures only require (Total Size / Leverage) down-payment collateral
+    const marginCost = instrumentType === 'futures' 
+      ? totalSize / Number(futuresOptions?.leverage || 1) 
+      : totalSize;
 
-    if (totalCost > currentBalance) {
-      set({ lastMessage: `Not enough funds to buy ${asset.name}.` });
+    if (marginCost > get().balance) {
+      set({ lastMessage: `Not enough funds to cover the required margin of $${marginCost.toFixed(2)}.` });
       return { ok: false };
     }
 
     set((state) => {
-      const existing = state.holdings.find((item) => item.id === asset.id);
-      const holdings = existing
-        ? state.holdings.map((item) =>
-            item.id === asset.id
-              ? {
-                  ...item,
-                  quantity: Number((item.quantity + quantity).toFixed(8)),
-                  averagePrice: Number(
-                    ((item.averagePrice * item.quantity + totalCost) / (item.quantity + quantity)).toFixed(2),
-                  ),
-                }
-              : item,
-          )
-        : [
-            ...state.holdings,
-            {
-              id: asset.id,
-              symbol: asset.symbol,
-              name: asset.name,
-              quantity,
-              averagePrice: assetPrice,
-              currentPrice: assetPrice,
-              type: asset.type,
-            },
-          ];
+      const holdings = [...state.holdings];
+
+      if (instrumentType !== 'futures') {
+        // ── Spot / Stock Branch ──
+        const existingIndex = holdings.findIndex(
+          (item) => item.id === asset.id && item.instrumentType !== 'futures'
+        );
+
+        if (existingIndex > -1) {
+          const existingItem = holdings[existingIndex];
+          const nextQuantity = Number((existingItem.quantity + quantity).toFixed(8));
+          const nextAveragePrice = Number(
+            ((existingItem.averagePrice * existingItem.quantity + totalSize) / nextQuantity).toFixed(2)
+          );
+
+          holdings[existingIndex] = {
+            ...existingItem,
+            quantity: nextQuantity,
+            averagePrice: nextAveragePrice,
+            currentPrice: assetPrice,
+          };
+        } else {
+          holdings.push({
+            id: asset.id,
+            symbol: asset.symbol,
+            name: asset.name,
+            quantity,
+            averagePrice: assetPrice,
+            currentPrice: assetPrice,
+            type: asset.type,
+            instrumentType: 'stock',
+          });
+        }
+      } else {
+        // ── Advanced Leveraged Futures Contract Injection ──
+        // Generate an independent specific unique identifier key for this custom isolated risk contract
+        holdings.push({
+          id: `${asset.id}-futures-${crypto.randomUUID().slice(0, 4)}`,
+          assetId: asset.id,
+          symbol: asset.symbol,
+          name: asset.name,
+          quantity,
+          averagePrice: assetPrice,
+          currentPrice: assetPrice,
+          type: asset.type,
+          instrumentType: 'futures',
+          direction: futuresOptions.direction, // 'long' | 'short'
+          leverage: Number(futuresOptions.leverage),
+          margin: marginCost,
+          stopLoss: futuresOptions.stopLoss || null,
+          takeProfit: futuresOptions.takeProfit || null,
+          liquidationPrice: futuresOptions.liquidationPrice,
+          unrealizedPnL: 0,
+        });
+      }
 
       return {
-        balance: Number((state.balance - totalCost).toFixed(2)),
+        balance: Number((state.balance - marginCost).toFixed(2)),
         holdings,
         transactions: [
           {
@@ -110,12 +146,15 @@ const usePortfolioStore = create((set, get) => ({
             symbol: asset.symbol,
             quantity,
             price: assetPrice,
-            total: totalCost,
+            total: marginCost,
             time: new Date().toLocaleString('en-US'),
+            instrumentType,
           },
           ...state.transactions,
         ],
-        lastMessage: `Bought ${quantity} ${asset.symbol.toUpperCase()} for $${totalCost.toFixed(2)}.`,
+        lastMessage: instrumentType === 'futures'
+          ? `Opened Futures ${futuresOptions.direction.toUpperCase()} ${futuresOptions.leverage}x Position for ${quantity} ${asset.symbol.toUpperCase()}.`
+          : `Bought ${quantity} ${asset.symbol.toUpperCase()} on Spot for $${totalSize.toFixed(2)}.`,
       };
     });
 
@@ -132,16 +171,14 @@ const usePortfolioStore = create((set, get) => ({
             lastMessage: get().lastMessage,
           }),
         });
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     }, 0);
 
     return { ok: true };
   },
 
-  // ── Sell ──────────────────────────────────────────────────────────────────
-  sellAsset: ({ asset, amount }) => {
+  // ── CLOSE/SELL POSITION ──────────────────────────────────────────────────
+  sellAsset: ({ asset, amount, instrumentType = 'stock' }) => {
     const quantity = Number(amount);
     if (!asset || !Number.isFinite(quantity) || quantity <= 0) {
       set({ lastMessage: 'Enter a valid amount.' });
@@ -150,42 +187,50 @@ const usePortfolioStore = create((set, get) => ({
 
     const assetPrice = Number(asset.price);
     if (!Number.isFinite(assetPrice) || assetPrice <= 0) {
-      set({ lastMessage: 'Price unavailable for this asset right now.' });
+      set({ lastMessage: 'Price unavailable right now.' });
       return { ok: false };
     }
 
-    const holding = get().holdings.find((item) => item.id === asset.id);
-    if (!holding || holding.quantity < quantity) {
-      set({ lastMessage: `Not enough ${asset.name} to sell.` });
+    // Isolated Spot asset verification check
+    if (instrumentType !== 'futures') {
+      const holding = get().holdings.find((item) => item.id === asset.id && item.instrumentType !== 'futures');
+      if (!holding || holding.quantity < quantity) {
+        set({ lastMessage: `Not enough ${asset.name} on spot to settle sell order.` });
+        return { ok: false };
+      }
+
+      const totalGain = quantity * assetPrice;
+
+      set((state) => ({
+        balance: Number((state.balance + totalGain).toFixed(2)),
+        holdings: state.holdings
+          .map((item) =>
+            item.id === asset.id && item.instrumentType !== 'futures'
+              ? { ...item, quantity: Number((item.quantity - quantity).toFixed(8)) }
+              : item
+          )
+          .filter((item) => item.quantity > 0),
+        transactions: [
+          {
+            id: crypto.randomUUID(),
+            type: 'sell',
+            assetName: asset.name,
+            symbol: asset.symbol,
+            quantity,
+            price: assetPrice,
+            total: totalGain,
+            time: new Date().toLocaleString('en-US'),
+            instrumentType: 'stock',
+          },
+          ...state.transactions,
+        ],
+        lastMessage: `Sold ${quantity} ${asset.symbol.toUpperCase()} on spot for $${totalGain.toFixed(2)}.`,
+      }));
+    } else {
+      // Manual futures complete order settlement override safety loop fallback notice
+      set({ lastMessage: 'Futures contracts are closed dynamically via your Take Profit, Stop Loss, or Liquidation triggers.' });
       return { ok: false };
     }
-
-    const totalGain = quantity * assetPrice;
-
-    set((state) => ({
-      balance: Number((state.balance + totalGain).toFixed(2)),
-      holdings: state.holdings
-        .map((item) =>
-          item.id === asset.id
-            ? { ...item, quantity: Number((item.quantity - quantity).toFixed(8)) }
-            : item,
-        )
-        .filter((item) => item.quantity > 0),
-      transactions: [
-        {
-          id: crypto.randomUUID(),
-          type: 'sell',
-          assetName: asset.name,
-          symbol: asset.symbol,
-          quantity,
-          price: assetPrice,
-          total: totalGain,
-          time: new Date().toLocaleString('en-US'),
-        },
-        ...state.transactions,
-      ],
-      lastMessage: `Sold ${quantity} ${asset.symbol.toUpperCase()} for $${totalGain.toFixed(2)}.`,
-    }));
 
     setTimeout(async () => {
       try {
@@ -200,28 +245,79 @@ const usePortfolioStore = create((set, get) => ({
             lastMessage: get().lastMessage,
           }),
         });
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     }, 0);
 
     return { ok: true };
   },
 
-  // ── Sync market prices ────────────────────────────────────────────────────
+  // ── LIVE TICK OVERWATCH (AUTO LIQUIDATION & SL/TP EXECUTION KERNEL) ──────
   syncMarketPrices: (marketAssets) =>
-    set((state) => ({
-      holdings: state.holdings.map((holding) => {
-        const found = marketAssets.find((a) => a.id === holding.id);
+    set((state) => {
+      let updatedBalance = state.balance;
+      let transactions = [...state.transactions];
+      let logs = [];
+
+      const nextHoldings = state.holdings.map((holding) => {
+        const found = marketAssets.find((a) => a.id === (holding.assetId || holding.id));
         if (!found) return holding;
         const nextPrice = Number(found.price);
-        return Number.isFinite(nextPrice) && nextPrice > 0
-          ? { ...holding, currentPrice: nextPrice }
-          : holding;
-      }),
-    })),
 
-  // ── Fetch from server ─────────────────────────────────────────────────────
+        if (holding.instrumentType !== 'futures') {
+          return { ...holding, currentPrice: nextPrice };
+        }
+
+        // ─── DYNAMIC FUTURES CALCULATION PNL ───
+        let priceDiff = holding.direction === 'long' 
+          ? nextPrice - holding.averagePrice 
+          : holding.averagePrice - nextPrice;
+
+        let unrealizedPnL = priceDiff * holding.quantity;
+
+        // Check Risk Triggers
+        let triggered = false;
+        let reason = '';
+
+        if (holding.direction === 'long' && nextPrice <= holding.liquidationPrice) { triggered = true; reason = 'Liquidation'; }
+        else if (holding.direction === 'short' && nextPrice >= holding.liquidationPrice) { triggered = true; reason = 'Liquidation'; }
+        else if (holding.stopLoss && ((holding.direction === 'long' && nextPrice <= holding.stopLoss) || (holding.direction === 'short' && nextPrice >= holding.stopLoss))) { triggered = true; reason = 'Stop Loss'; }
+        else if (holding.takeProfit && ((holding.direction === 'long' && nextPrice >= holding.takeProfit) || (holding.direction === 'short' && nextPrice <= holding.takeProfit))) { triggered = true; reason = 'Take Profit'; }
+
+        if (triggered) {
+          // Position close operation: return margin left + PnL realized
+          let finalPayout = reason === 'Liquidation' ? 0 : holding.margin + unrealizedPnL;
+          if (finalPayout < 0) finalPayout = 0;
+
+          updatedBalance = Number((updatedBalance + finalPayout).toFixed(2));
+          
+          transactions.unshift({
+            id: crypto.randomUUID(),
+            type: 'futures_close',
+            assetName: `${holding.name} (${reason})`,
+            symbol: holding.symbol,
+            quantity: holding.quantity,
+            price: nextPrice,
+            total: unrealizedPnL,
+            time: new Date().toLocaleTimeString(),
+            instrumentType: 'futures'
+          });
+
+          logs.push(`${holding.symbol.toUpperCase()} position closed via ${reason}.`);
+          return null; // Removes it from holdings array
+        }
+
+        return { ...holding, currentPrice: nextPrice, unrealizedPnL };
+      }).filter(Boolean);
+
+      return {
+        balance: updatedBalance,
+        holdings: nextHoldings,
+        transactions,
+        ...(logs.length > 0 ? { lastMessage: logs[0] } : {})
+      };
+    }),
+
+  // ── FETCH INITIAL PORTFOLIO STATE FROM API SERVER ────────────────────────
   fetchFromServer: async () => {
     try {
       const res = await fetch('/api/portfolio', { credentials: 'include' });
@@ -229,7 +325,13 @@ const usePortfolioStore = create((set, get) => ({
       const data = await res.json();
       const p = data.portfolio;
       if (!p) return null;
-      set({ balance: p.balance, holdings: p.holdings, transactions: p.transactions, lastMessage: p.lastMessage });
+      
+      set({ 
+        balance: p.balance, 
+        holdings: p.holdings || [], 
+        transactions: p.transactions || [], 
+        lastMessage: p.lastMessage 
+      });
       return p;
     } catch (e) {
       return null;
