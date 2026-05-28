@@ -1,9 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
 
-function AssetCard({ asset, onTrade }) {
+function AssetCard({ asset }) {
   const navigate = useNavigate();
-  const user = useAuthStore((s) => s.user);
 
   const change24hRaw = Number(asset?.change24h);
   const change24h = Number.isFinite(change24hRaw) ? change24hRaw : 0;
@@ -13,16 +11,25 @@ function AssetCard({ asset, onTrade }) {
   const quoteCurrency = typeof asset?.quoteCurrency === 'string' ? asset.quoteCurrency : '';
   const isFxCard = asset?.type === 'currency' && quoteCurrency;
 
-  const handleTrade = () => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    onTrade(asset);
+  const openAsset = () => {
+    const type = String(asset?.type || '').toLowerCase();
+    const id = encodeURIComponent(String(asset?.id || ''));
+    navigate(`/asset/${type}/${id}`);
   };
 
   return (
-    <article className="asset-card">
+    <article
+      className="asset-card"
+      role="button"
+      tabIndex={0}
+      onClick={openAsset}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openAsset();
+        }
+      }}
+    >
       <header>
         <div>
           <h3>{asset.name}</h3>
@@ -45,8 +52,15 @@ function AssetCard({ asset, onTrade }) {
         </div>
       </div>
 
-      <button type="button" className="secondary-button" onClick={handleTrade}>
-        {user ? 'Buy or sell' : 'Sign in to trade'}
+      <button
+        type="button"
+        className="secondary-button"
+        onClick={(event) => {
+          event.stopPropagation();
+          openAsset();
+        }}
+      >
+        Open
       </button>
     </article>
   );

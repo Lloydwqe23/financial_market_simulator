@@ -3,6 +3,7 @@ import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import CryptoPage from './pages/CryptoPage';
 import StocksPage from './pages/StocksPage';
 import CurrencyPage from './pages/CurrencyPage';
+import AssetDetailPage from './pages/AssetDetailPage';
 import PortfolioPage from './pages/PortfolioPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -93,6 +94,7 @@ function App() {
           <Route path="/crypto" element={<CryptoPage />} />
           <Route path="/stocks" element={<StocksPage />} />
           <Route path="/currency" element={<CurrencyPage />} />
+          <Route path="/asset/:type/:id" element={<AssetDetailPage />} />
           <Route path="/portfolio" element={<PortfolioPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/login" element={<LoginPage />} />

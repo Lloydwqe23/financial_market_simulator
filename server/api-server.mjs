@@ -459,6 +459,66 @@ function parseStooqCsv(text, fallbackSymbol, fallbackName) {
   };
 }
 
+function parseStooqDailyHistoryCsv(text, fallbackSymbol, fallbackName) {
+  const rows = text
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (rows.length < 2) {
+    throw new Error(`No history returned for ${fallbackSymbol}`);
+  }
+
+  const dataRows = rows.filter((line) => !line.toLowerCase().startsWith('date,'));
+  const candles = dataRows
+    .map((row) => {
+      const [date, open, high, low, close] = row.split(',');
+      const t = Date.parse(date);
+      const openPrice = toNumber(open);
+      const highPrice = toNumber(high);
+      const lowPrice = toNumber(low);
+      const closePrice = toNumber(close);
+
+      if (!Number.isFinite(t) || ![openPrice, highPrice, lowPrice, closePrice].every((v) => typeof v === 'number')) {
+        return null;
+      }
+
+      return {
+        t,
+        open: openPrice,
+        high: highPrice,
+        low: lowPrice,
+        close: closePrice,
+      };
+    })
+    .filter(Boolean);
+
+  if (candles.length < 2) {
+    throw new Error(`History parse failed for ${fallbackSymbol}`);
+  }
+
+  return {
+    id: fallbackSymbol.toLowerCase(),
+    symbol: fallbackSymbol,
+    name: fallbackName,
+    type: 'stock',
+    candles,
+  };
+}
+
+async function fetchStockHistory(stock) {
+  const url = `https://stooq.com/q/d/l/?s=${stock.symbol.toLowerCase()}.us&i=d`;
+  const response = await fetch(url, { headers: { accept: 'text/csv,*/*' } });
+
+  if (!response.ok) {
+    throw new Error(`Stooq history request failed for ${stock.symbol}`);
+  }
+
+  const text = await response.text();
+  return parseStooqDailyHistoryCsv(text, stock.symbol, stock.name);
+}
+
 async function fetchStockQuote(stock) {
   const url = `https://stooq.com/q/l/?s=${stock.symbol.toLowerCase()}.us&f=sd2t2ohlcv&e=csv`;
   const response = await fetch(url, { headers: { accept: 'text/csv,*/*' } });
@@ -527,6 +587,34 @@ const server = http.createServer(async (req, res) => {
         source: 'stooq-proxy',
         updatedAt,
         quotes,
+      });
+    } catch (error) {
+      sendJson(res, req, 500, { error: error.message });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/stocks/history') {
+    try {
+      const id = String(requestUrl.searchParams.get('id') || '').trim().toLowerCase();
+      const limit = Math.max(20, Math.min(800, Number(requestUrl.searchParams.get('limit') || 320)));
+
+      const stock = STOCK_WATCHLIST.find((item) => item.id === id || item.symbol.toLowerCase() === id);
+      if (!stock) {
+        sendJson(res, req, 404, { error: 'unknown stock' });
+        return;
+      }
+
+      const history = await fetchStockHistory(stock);
+      const candles = Array.isArray(history?.candles) ? history.candles : [];
+      const sliced = candles.slice(-limit);
+
+      sendJson(res, req, 200, {
+        id: stock.id,
+        symbol: stock.symbol,
+        name: stock.name,
+        candles: sliced,
+        updatedAt: new Date().toISOString(),
       });
     } catch (error) {
       sendJson(res, req, 500, { error: error.message });

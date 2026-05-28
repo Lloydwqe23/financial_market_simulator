@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import AssetCard from '../components/AssetCard';
-import TradePanel from '../components/TradePanel';
 import { usePortfolioStore } from '../store/portfolioStore';
 import { CURRENCIES, useMarketStore } from '../store/marketStore';
 
@@ -16,12 +15,7 @@ function CurrencyPage() {
   const loadCurrencyRates = useMarketStore((state) => state.loadCurrencyRates);
   const [selectedBase, setSelectedBase] = useState('USD');
   const [tick, setTick] = useState(0);
-  const [selectedAssetId, setSelectedAssetId] = useState('');
-  const balance = usePortfolioStore((state) => state.balance);
-  const buyAsset = usePortfolioStore((state) => state.buyAsset);
-  const sellAsset = usePortfolioStore((state) => state.sellAsset);
   const syncMarketPrices = usePortfolioStore((state) => state.syncMarketPrices);
-  const lastMessage = usePortfolioStore((state) => state.lastMessage);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -86,14 +80,6 @@ function CurrencyPage() {
     return Number.isFinite(value) && value > 0 ? value : null;
   }, [rates.usd, selectedBase]);
 
-  const balanceInBase = useMemo(() => {
-    if (!usdPerBase) {
-      return balance;
-    }
-
-    return balance / usdPerBase;
-  }, [balance, usdPerBase]);
-
   const fxCards = useMemo(() => {
     if (!usdPerBase) {
       return [];
@@ -130,16 +116,6 @@ function CurrencyPage() {
       .filter(Boolean);
   }, [changes, rates, selectedBase, tick, usdPerBase]);
 
-  const selectedAsset = useMemo(() => {
-    if (fxCards.length === 0) {
-      return null;
-    }
-
-    return selectedAssetId
-      ? fxCards.find((asset) => asset.id === selectedAssetId) ?? fxCards[0] ?? null
-      : fxCards[0] ?? null;
-  }, [fxCards, selectedAssetId]);
-
   const fxMarketAssetsUsd = useMemo(() => {
     if (!usdPerBase) {
       return [];
@@ -173,87 +149,37 @@ function CurrencyPage() {
     syncMarketPrices(fxMarketAssetsUsd);
   }, [fxMarketAssetsUsd, ready, syncMarketPrices]);
 
-  useEffect(() => {
-    if (!ready || fxCards.length === 0) {
-      return;
-    }
-
-    if (selectedAssetId && fxCards.some((asset) => asset.id === selectedAssetId)) {
-      return;
-    }
-
-    setSelectedAssetId(fxCards[0].id);
-  }, [fxCards, ready, selectedAssetId]);
-
   return (
-    <section className="page-grid">
-      <div className="surface">
-        <div className="hero">
-          <h2>Currency</h2>
-          <p>Pick a base currency and trade FX pairs.</p>
-          <p className="asset-meta">Status: {status}</p>
-          <p className="asset-meta">
-            1 {selectedBase} ≈ {usdAnchor === null ? '...' : `${Number(usdAnchor).toFixed(4)} USD`}
-          </p>
-          <p className="asset-meta">Currencies tracked: {CURRENCIES.length}</p>
-        </div>
-
-        <div className="grid-cards" style={{ marginBottom: 20 }}>
-          <label className="asset-card">
-            <span className="asset-meta">Base currency</span>
-            <select value={selectedBase} onChange={(event) => setSelectedBase(event.target.value)}>
-              {CURRENCIES.map((code) => (
-                <option key={code} value={code}>
-                  {code}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="grid-cards">
-          {fxCards.length === 0 ? (
-            <div className="empty-state">Loading FX market...</div>
-          ) : (
-            fxCards.map((asset) => (
-              <AssetCard key={asset.id} asset={asset} onTrade={(assetItem) => setSelectedAssetId(assetItem.id)} />
-            ))
-          )}
-        </div>
+    <section className="surface">
+      <div className="hero">
+        <h2>Currency</h2>
+        <p>Pick a base currency and trade FX pairs.</p>
+        <p className="asset-meta">Status: {status}</p>
+        <p className="asset-meta">
+          1 {selectedBase} ≈ {usdAnchor === null ? '...' : `${Number(usdAnchor).toFixed(4)} USD`}
+        </p>
+        <p className="asset-meta">Currencies tracked: {CURRENCIES.length}</p>
       </div>
 
-      <div className="section-list">
-        <TradePanel
-          asset={selectedAsset}
-          balance={balanceInBase}
-          quoteCurrency={selectedBase}
-          onClose={() => setSelectedAssetId('')}
-          onBuy={(tradeAmount) => {
-            if (!selectedAsset) {
-              return;
-            }
+      <div className="grid-cards" style={{ marginBottom: 20 }}>
+        <label className="asset-card">
+          <span className="asset-meta">Base currency</span>
+          <select value={selectedBase} onChange={(event) => setSelectedBase(event.target.value)}>
+            {CURRENCIES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
-            buyAsset({
-              asset: { ...selectedAsset, price: selectedAsset.priceUsd },
-              amount: tradeAmount,
-            });
-          }}
-          onSell={(tradeAmount) => {
-            if (!selectedAsset) {
-              return;
-            }
-
-            sellAsset({
-              asset: { ...selectedAsset, price: selectedAsset.priceUsd },
-              amount: tradeAmount,
-            });
-          }}
-        />
-
-        <div className="surface">
-          <h3>Latest message</h3>
-          <p>{lastMessage}</p>
-        </div>
+      <div className="grid-cards">
+        {fxCards.length === 0 ? (
+          <div className="empty-state">Loading FX market...</div>
+        ) : (
+          fxCards.map((asset) => <AssetCard key={asset.id} asset={asset} />)
+        )}
       </div>
     </section>
   );
