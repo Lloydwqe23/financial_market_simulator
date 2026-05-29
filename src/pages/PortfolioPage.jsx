@@ -1,13 +1,87 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePortfolioStore } from '../store/portfolioStore';
+import { CURRENCIES, useMarketStore } from '../store/marketStore';
 
 function PortfolioPage() {
   const balance = usePortfolioStore((state) => state.balance);
   const holdings = usePortfolioStore((state) => state.holdings);
   const transactions = usePortfolioStore((state) => state.transactions);
+  const syncMarketPrices = usePortfolioStore((state) => state.syncMarketPrices);
+
+  // Grab market store actions to hydrate the portfolio page dynamically
+  const loadCryptoAssets = useMarketStore((state) => state.loadCryptoAssets);
+  const loadStockAssets = useMarketStore((state) => state.loadStockAssets);
+  const loadCurrencyRates = useMarketStore((state) => state.loadCurrencyRates);
+  const currencyBase = useMarketStore((state) => state.currencyBase);
 
   // Filter selection: 'all' | 'crypto' | 'stock' | 'currency'
   const [activeCategory, setActiveCategory] = useState('all');
+
+  // ── NEW: DYNAMIC LIVE BACKGROUND FEED OVERWATCH KERNEL ──────────────────
+  useEffect(() => {
+    let mounted = true;
+    let timerId = 0;
+    let inFlight = false;
+
+    const refreshMarketFeeds = async () => {
+      if (inFlight) return;
+      inFlight = true;
+
+      try {
+        // Fetch all market assets concurrently to ensure immediate sync on mount
+        await Promise.allSettled([
+          loadCryptoAssets(),
+          loadStockAssets(),
+          loadCurrencyRates(currencyBase || 'USD')
+        ]);
+
+        if (!mounted) return;
+
+        // Extract fresh current price states
+        const currentCrypto = useMarketStore.getState().cryptoAssets;
+        const currentStocks = useMarketStore.getState().stockAssets;
+        
+        // Build Forex asset matrix manually to map currency IDs to tickers correctly
+        const rates = useMarketStore.getState().currencyRates;
+        const base = currencyBase || 'USD';
+        const usdPerBase = base === 'USD' ? 1 : Number(rates?.usd || 1);
+        
+        const fxAssets = CURRENCIES.map((code) => {
+          const codeLow = code.toLowerCase();
+          const baseToCode = Number(rates?.[codeLow]);
+          const priceUsd = Number.isFinite(baseToCode) && baseToCode > 0 ? usdPerBase / baseToCode : null;
+          return {
+            id: `fx-${codeLow}`,
+            symbol: codeLow,
+            name: code,
+            type: 'currency',
+            price: priceUsd || 0,
+          };
+        }).filter((a) => a.price > 0);
+
+        // Pipe everything into your store core to calculate real-time PnL and check triggers
+        const aggregateMarketTickers = [...currentCrypto, ...currentStocks, ...fxAssets];
+        syncMarketPrices(aggregateMarketTickers);
+
+      } catch (err) {
+        // Prevent silent thread blocking crashes
+      } finally {
+        inFlight = false;
+        if (mounted) {
+          // Poll every single second for smooth ticker transformations
+          timerId = window.setTimeout(refreshMarketFeeds, 1000);
+        }
+      }
+    };
+
+    refreshMarketFeeds();
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(timerId);
+    };
+  }, [currencyBase, loadCryptoAssets, loadCurrencyRates, loadStockAssets, syncMarketPrices]);
+  // ───────────────────────────────────────────────────────────────────────────
 
   // Dynamically calculate portfolio worth accounting for spot valuation + unrealized futures PnL
   const portfolioValue = useMemo(() => {
@@ -15,7 +89,6 @@ function PortfolioPage() {
       if (item.instrumentType !== 'futures') {
         return sum + item.quantity * item.currentPrice;
       }
-      // For futures, portfolio equity value is its initial collateral margin plus its current unrealized PnL
       const pnl = item.unrealizedPnL || 0;
       return sum + item.margin + pnl;
     }, 0);
@@ -50,7 +123,6 @@ function PortfolioPage() {
   // Helper render method for handling sub-tables neatly
   const renderSubSection = (title, items) => {
     if (!items || items.length === 0) return null;
-    const isFuturesSection = title.toLowerCase().includes('futures');
 
     return (
       <div style={{ margin: '14px 0 24px 16px' }}>
@@ -61,7 +133,6 @@ function PortfolioPage() {
           {items.map((holding) => {
             const isFutures = holding.instrumentType === 'futures';
             
-            // Calculate outputs dynamically based on instrument specifications
             let displayPnL = 0;
             let totalDisplayValue = 0;
 

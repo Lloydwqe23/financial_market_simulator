@@ -64,7 +64,6 @@ function App() {
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Course project</p>
           <h1>Market Simulator</h1>
         </div>
         <div className="topbar-stats">

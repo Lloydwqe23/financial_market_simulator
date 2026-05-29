@@ -9,6 +9,7 @@ import {
 } from '../api/marketApi';
 import { CURRENCIES, useMarketStore } from '../store/marketStore';
 import { usePortfolioStore } from '../store/portfolioStore';
+import { useAuthStore } from '../store/authStore';
 
 const TIMEFRAMES = [
   { value: '1m',  label: '1m',  ms: 60 * 1000,                binanceInterval: '1m'  },
@@ -21,6 +22,8 @@ const TIMEFRAMES = [
   { value: '1w',  label: '1W',  ms: 7 * 24 * 60 * 60 * 1000,  binanceInterval: '1w'  },
   { value: '1M',  label: '1M',  ms: 30 * 24 * 60 * 60 * 1000, binanceInterval: '1M'  },
 ];
+
+const PRESET_COLORS = ['#eab308', '#3b82f6', '#ec4899', '#a855f7', '#10b981', '#f43f5e', '#06b6d4'];
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -57,18 +60,10 @@ function mulberry32(seed) {
   };
 }
 
-/**
- * Given an array of daily OHLC candles, resample/synthesize to a finer timeframe.
- * For timeframes coarser than or equal to 1d, just aggregate daily candles into
- * weekly/monthly buckets. For intraday timeframes, interpolate inside each daily
- * candle using a seeded RNG so the result is stable across re-renders.
- */
 function resampleDailyCandles(dailyCandles, intervalMs, seed) {
   if (!Array.isArray(dailyCandles) || dailyCandles.length === 0) return [];
-
   const DAY_MS = 24 * 60 * 60 * 1000;
 
-  // ── Coarser-than-daily: aggregate ──────────────────────────────────────────
   if (intervalMs >= DAY_MS) {
     const buckets = new Map();
     for (const c of dailyCandles) {
@@ -85,33 +80,29 @@ function resampleDailyCandles(dailyCandles, intervalMs, seed) {
     return Array.from(buckets.values()).sort((a, b) => a.t - b.t);
   }
 
-  // ── Intraday: synthesise sub-candles from each daily candle ────────────────
   const rng      = mulberry32(seed);
   const stepsPerDay = Math.round(DAY_MS / intervalMs);
   const result   = [];
 
   for (const daily of dailyCandles) {
-    // distribute the day's move across intraday steps with a random walk
     const dayOpen  = daily.open;
     const dayClose = daily.close;
     const dayHigh  = daily.high;
     const dayLow   = daily.low;
     const range    = dayHigh - dayLow || dayOpen * 0.002;
 
-    // build a tiny random walk that starts at open and ends at close
     const rawWalk = [0];
     for (let i = 1; i < stepsPerDay; i++) {
       rawWalk.push(rawWalk[i - 1] + (rng() - 0.5));
     }
-    rawWalk.push(0); // anchor end to zero before scaling
+    rawWalk.push(0);
 
     const minW = Math.min(...rawWalk);
     const maxW = Math.max(...rawWalk);
     const walkRange = maxW - minW || 1;
 
-    // scale walk so it fits within day's high/low
     const prices = rawWalk.map((w, i) => {
-      const progress = i / (stepsPerDay);
+      const progress = i / stepsPerDay;
       const trend    = dayOpen + (dayClose - dayOpen) * progress;
       const noise    = ((w - minW) / walkRange - 0.5) * range * 0.7;
       return clamp(trend + noise, dayLow, dayHigh);
@@ -128,7 +119,6 @@ function resampleDailyCandles(dailyCandles, intervalMs, seed) {
       result.push({ t, open, high: Math.min(high, dayHigh), low: Math.max(low, dayLow), close });
     }
   }
-
   return result;
 }
 
@@ -188,11 +178,8 @@ function buildSyntheticCandles({ seed, endPrice, candleMs, count = 1000, baseVol
     backwards.push({ t, open, high, low, close });
     close = open;
   }
-
   return backwards.reverse();
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 function AssetDetailPage() {
   const navigate    = useNavigate();
@@ -215,16 +202,17 @@ function AssetDetailPage() {
   const buyAsset        = usePortfolioStore((s) => s.buyAsset);
   const sellAsset       = usePortfolioStore((s) => s.sellAsset);
   const syncMarketPrices = usePortfolioStore((s) => s.syncMarketPrices);
+  const holdings        = usePortfolioStore((s) => s.holdings);
 
-  // ─── PLACE SNIPPET 1 HERE (STORE ACTION HOOK) ───
+  const authUser = useAuthStore((s) => s.user);
+  const activeUserBalance = authUser ? balance : 0;
+
+  // Trigger Modifier Hooks
   const updatePositionTriggers = usePortfolioStore((s) => s.updatePositionTriggers);
-
-  // ─── PLACE SNIPPET 2 HERE (LOCAL MODAL COMPONENT STATE) ───
   const [editingPositionId, setEditingPositionId] = useState(null);
   const [localSL, setLocalSL] = useState('');
   const [localTP, setLocalTP] = useState('');
 
-  // ─── PLACE SNIPPET 3 HERE (THE CONTROLLER FUNCTIONS) ───
   const handleOpenModifier = (holding) => {
     setEditingPositionId(holding.id);
     setLocalSL(holding.stopLoss ? String(holding.stopLoss) : '');
@@ -237,40 +225,76 @@ function AssetDetailPage() {
       stopLoss: localSL ? Number(localSL) : null,
       takeProfit: localTP ? Number(localTP) : null
     });
-    setEditingPositionId(null); // Close modification menu
+    setEditingPositionId(null);
   };
 
   const [timeframe, setTimeframe]       = useState('15m');
   const tfConfig   = useMemo(() => getTimeframeConfig(timeframe), [timeframe]);
-  const timeframeMs = tfConfig.ms;
+  const timeframeMs = tfConfig?.ms || 15 * 60 * 1000;
 
   const [tick, setTick]               = useState(0);
   const [candles, setCandles]         = useState([]);
   const [historyReady, setHistoryReady] = useState(false);
 
-  // Cache of raw daily stock candles so we don't re-fetch on every TF switch
   const stockDailyCache = useRef(null);
   const stockDailyCacheId = useRef(null);
 
-  // ── Live tick every second ──────────────────────────────────────────────────
+  // ── NEW: DYNAMIC CONFIGURABLE INDICATORS INSTANCE STATE ARRAY ──
+  const [activeIndicators, setActiveIndicators] = useState([]);
+  const [showIndicatorMenu, setShowIndicatorMenu] = useState(false);
+
+  const addIndicatorInstance = (type) => {
+    const defaultColor = type === 'rsi' ? '#a855f7' : type === 'macd' ? '#06b6d4' : PRESET_COLORS[activeIndicators.length % PRESET_COLORS.length];
+    
+    // Enforce uniqueness constraints on sub-panels to prevent double rendering
+    if ((type === 'rsi' || type === 'macd') && activeIndicators.some(i => i.type === type)) {
+      return; 
+    }
+
+    const newInstance = {
+      id: `${type}-${crypto.randomUUID().slice(0, 4)}`,
+      type,
+      color: defaultColor,
+      ...(type === 'ma' ? { period: 20 } : {}),
+      ...(type === 'bb' ? { period: 20, stdDev: 2 } : {}),
+      ...(type === 'rsi' ? { period: 14 } : {}),
+      ...(type === 'macd' ? { fast: 12, slow: 26, signal: 9 } : {})
+    };
+    setActiveIndicators((prev) => [...prev, newInstance]);
+  };
+
+  const removeIndicatorInstance = (id) => {
+    setActiveIndicators((prev) => prev.filter((ind) => ind.id !== id));
+  };
+
+  const updateIndicatorParameter = (id, field, value) => {
+    setActiveIndicators((prev) => prev.map((ind) => {
+      if (ind.id !== id) return ind;
+      return { ...ind, [field]: value };
+    }));
+  };
+
+  // Live positions filter with fallback string splitter validation
+  const activeAssetHoldings = useMemo(() => {
+    if (!Array.isArray(holdings)) return [];
+    return holdings.filter((item) => {
+      if (!item) return false;
+      const positionBaseId = item.assetId || (item.id && typeof item.id === 'string' ? item.id.split('-')[0] : '');
+      return positionBaseId === assetId;
+    });
+  }, [holdings, assetId]);
+
   useEffect(() => {
     const id = window.setInterval(() => setTick((v) => v + 1), 1000);
     return () => window.clearInterval(id);
   }, []);
 
-  // ── Reset on asset / currency change (not timeframe — handled separately) ──
   useEffect(() => {
     setCandles([]);
     setHistoryReady(false);
-  }, [assetId, assetType, currencyBase]);
+  }, [assetId, assetType, currencyBase, timeframe]);
 
-  // ── Reset history when timeframe changes (keep cache for stocks) ────────────
-  useEffect(() => {
-    setCandles([]);
-    setHistoryReady(false);
-  }, [timeframe]);
-
-  // ── Market data refresh loop ────────────────────────────────────────────────
+  // Market fetching controller context loops
   useEffect(() => {
     let mounted   = true;
     let timerId   = 0;
@@ -296,11 +320,8 @@ function AssetDetailPage() {
               const fxAssets = CURRENCIES.map((code) => {
                 const codeLow    = code.toLowerCase();
                 const baseToCode = Number(useMarketStore.getState().currencyRates?.[codeLow]);
-                const priceUsd   = Number.isFinite(baseToCode) && baseToCode > 0
-                  ? okUsdBase / baseToCode : null;
-                return { id: `fx-${codeLow}`, symbol: codeLow, name: code, type: 'currency',
-                         price: typeof priceUsd === 'number' && Number.isFinite(priceUsd) ? priceUsd : 0,
-                         change24h: 0 };
+                const priceUsd   = Number.isFinite(baseToCode) && baseToCode > 0 ? okUsdBase / baseToCode : null;
+                return { id: `fx-${codeLow}`, symbol: codeLow, name: code, type: 'currency', price: priceUsd || 0, change24h: 0 };
               }).filter((a) => a.price > 0);
               syncMarketPrices(fxAssets);
             }
@@ -309,17 +330,14 @@ function AssetDetailPage() {
       } finally {
         inFlight = false;
         if (mounted) {
-          const delay = assetType === 'currency' ? 30000 : 1000;
-          timerId = window.setTimeout(loop, delay);
+          timerId = window.setTimeout(loop, assetType === 'currency' ? 30000 : 1000);
         }
       }
     };
-
     loop();
     return () => { mounted = false; window.clearTimeout(timerId); };
   }, [assetType, currencyBase, loadCryptoAssets, loadCurrencyRates, loadStockAssets, syncMarketPrices]);
 
-  // ── Derived display asset ───────────────────────────────────────────────────
   const displayAsset = useMemo(() => {
     if (assetType === 'crypto')  return cryptoAssets.find((a) => a.id === assetId) ?? null;
     if (assetType === 'stock')   return stockAssets.find((a) => a.id === assetId) ?? null;
@@ -327,9 +345,7 @@ function AssetDetailPage() {
       const codeLow = assetId.replace(/^fx-/, '').toLowerCase();
       const base    = currencyBase || 'USD';
       if (codeLow === base.toLowerCase()) {
-        return { id: `fx-${codeLow}`, symbol: codeLow, name: codeLow.toUpperCase(),
-                 type: 'currency', price: 1, change24h: 0, quoteCurrency: base,
-                 priceUsd: base === 'USD' ? 1 : Number(currencyRates?.usd) || 0 };
+        return { id: `fx-${codeLow}`, symbol: codeLow, name: codeLow.toUpperCase(), type: 'currency', price: 1, change24h: 0, quoteCurrency: base, priceUsd: base === 'USD' ? 1 : Number(currencyRates?.usd) || 0 };
       }
       const baseToCode   = Number(currencyRates?.[codeLow]);
       if (!Number.isFinite(baseToCode) || baseToCode <= 0) return null;
@@ -337,227 +353,98 @@ function AssetDetailPage() {
       const okUsdPerBase = Number.isFinite(usdPerBase) && usdPerBase > 0 ? usdPerBase : null;
       if (!okUsdPerBase) return null;
       const pulse        = Math.sin((tick + hashCurrency(`${base}-${codeLow}`)) / 6) * 0.0006;
-      const priceInBase  = (1 / baseToCode) * (1 + pulse);
-      const priceUsd     = (okUsdPerBase / baseToCode) * (1 + pulse);
-      const changeRaw    = currencyChanges?.[codeLow];
-      const changeRate   = typeof changeRaw === 'number' && Number.isFinite(changeRaw) ? changeRaw : null;
-      const changeInBase = (changeRate !== null ? -changeRate : 0) + pulse * 100;
-      return { id: `fx-${codeLow}`, symbol: codeLow, name: codeLow.toUpperCase(),
-               type: 'currency', price: priceInBase, change24h: changeInBase,
-               quoteCurrency: base, priceUsd };
+      return { id: `fx-${codeLow}`, symbol: codeLow, name: codeLow.toUpperCase(), type: 'currency', price: (1 / baseToCode) * (1 + pulse), change24h: (-Number(currencyChanges?.[codeLow] || 0)) + pulse * 100, quoteCurrency: base, priceUsd: (okUsdPerBase / baseToCode) * (1 + pulse) };
     }
     return null;
   }, [assetId, assetType, cryptoAssets, currencyBase, currencyChanges, currencyRates, stockAssets, tick]);
 
+  const historyKey = useMemo(() => `${assetType}:${assetId}:${timeframe}`, [assetId, assetType, timeframe]);
 
-  const holdings = usePortfolioStore((state) => state.holdings);
-
-  const activeAssetHoldings = useMemo(() => {
-    return holdings.filter((item) => {
-      // FIX: Parse the prefix out of composite contract strings safely
-      const positionBaseId = item.assetId || item.id.split('-')[0];
-      return positionBaseId === assetId;
-    });
-  }, [holdings, assetId]);
-
-  // ── History key (triggers reload when asset/TF/currency changes) ────────────
-  const historyKey = useMemo(() => {
-    if (assetType === 'currency')
-      return `${assetType}:${assetId}:${String(currencyBase || 'USD').toLowerCase()}:${timeframe}`;
-    return `${assetType}:${assetId}:${timeframe}`;
-  }, [assetId, assetType, currencyBase, timeframe]);
-
-  // ── History load ────────────────────────────────────────────────────────────
+  // History loader task loops
   useEffect(() => {
     let mounted = true;
-
     const loadHistory = async () => {
-      if (!displayAsset) return;
-
+      if (!displayAsset || !tfConfig) return;
       try {
-        // ── CRYPTO ──────────────────────────────────────────────────────────
         if (assetType === 'crypto') {
-          const isBinance = typeof displayAsset.quoteVolume === 'number' &&
-                            Number.isFinite(displayAsset.quoteVolume);
+          const isBinance = typeof displayAsset.quoteVolume === 'number' && Number.isFinite(displayAsset.quoteVolume);
           if (isBinance) {
-            const symbol = `${String(displayAsset.name || '').toUpperCase()}USDT`;
-            const klines = await fetchBinanceKlines({
-              symbol,
-              interval: tfConfig.binanceInterval,
-              limit: 1000,
-            });
-            if (!mounted) return;
-            setCandles(klines);
-            setHistoryReady(true);
+            const klines = await fetchBinanceKlines({ symbol: `${String(displayAsset.name).toUpperCase()}USDT`, interval: tfConfig.binanceInterval, limit: 1000 });
+            if (mounted) { setCandles(klines); setHistoryReady(true); }
             return;
           }
-          const days   = getCoinGeckoDays(tfConfig.value);
-          const prices = await fetchCoinGeckoMarketChart({ id: String(displayAsset.id), days });
+          const prices = await fetchCoinGeckoMarketChart({ id: String(displayAsset.id), days: getCoinGeckoDays(tfConfig.value) });
           const next   = resamplePricesToCandles(prices, timeframeMs);
-          if (!mounted) return;
-          setCandles(next);
-          setHistoryReady(true);
+          if (mounted) { setCandles(next); setHistoryReady(true); }
           return;
         }
-
-        // ── STOCK ────────────────────────────────────────────────────────────
-        // Fetch (or reuse cached) real daily candles, then resample to chosen TF
         if (assetType === 'stock') {
-          let dailyCandles = null;
-
-          if (stockDailyCacheId.current === assetId && stockDailyCache.current) {
-            dailyCandles = stockDailyCache.current;
-          } else {
+          let dailyCandles = (stockDailyCacheId.current === assetId) ? stockDailyCache.current : null;
+          if (!dailyCandles) {
             try {
               dailyCandles = await fetchStockHistoryCandles({ id: assetId, limit: 800 });
-              if (!mounted) return;
-              stockDailyCache.current   = dailyCandles;
-              stockDailyCacheId.current = assetId;
-            } catch {
-              dailyCandles = null;
-            }
+              if (mounted) { stockDailyCache.current = dailyCandles; stockDailyCacheId.current = assetId; }
+            } catch { dailyCandles = null; }
           }
-
           if (dailyCandles && dailyCandles.length >= 2) {
-            const seed        = hashCurrency(`stock:${assetId}:${timeframe}`);
-            const resampled   = resampleDailyCandles(dailyCandles, timeframeMs, seed);
-            if (!mounted) return;
-            setCandles(resampled);
-            setHistoryReady(true);
+            const resampled = resampleDailyCandles(dailyCandles, timeframeMs, hashCurrency(`stock:${assetId}:${timeframe}`));
+            if (mounted) { setCandles(resampled); setHistoryReady(true); }
             return;
           }
-
-          // Fallback: purely synthetic if API failed
-          const seed      = hashCurrency(`stock:${assetId}:${timeframe}:synth`);
-          const synthetic = buildSyntheticCandles({
-            seed,
-            endPrice:      Number(displayAsset.price),
-            candleMs:      timeframeMs,
-            count:         1000,
-            baseVolatility: 0.0018,
-          });
-          if (!mounted) return;
-          setCandles(synthetic);
-          setHistoryReady(true);
+          const synthetic = buildSyntheticCandles({ seed: hashCurrency(`stock:${assetId}:${timeframe}:synth`), endPrice: Number(displayAsset.price), candleMs: timeframeMs });
+          if (mounted) { setCandles(synthetic); setHistoryReady(true); }
           return;
         }
-
-        // ── CURRENCY ─────────────────────────────────────────────────────────
         if (assetType === 'currency') {
-          const seed       = hashCurrency(`${currencyBase || 'usd'}:${assetId}:${timeframe}`);
-          const baseCandles = buildSyntheticCandles({
-            seed,
-            endPrice:      Number(displayAsset.price),
-            candleMs:      timeframeMs,
-            count:         1000,
-            baseVolatility: 0.001,
-          });
-          if (!mounted) return;
-          setCandles(baseCandles);
-          setHistoryReady(true);
+          const baseCandles = buildSyntheticCandles({ seed: hashCurrency(`${currencyBase || 'usd'}:${assetId}:${timeframe}`), endPrice: Number(displayAsset.price), candleMs: timeframeMs });
+          if (mounted) { setCandles(baseCandles); setHistoryReady(true); }
           return;
         }
-
-        if (mounted) setHistoryReady(true);
       } catch (error) {
         if (!mounted) return;
-        const seed     = hashCurrency(`${assetType}:${assetId}`);
-        const fallback = buildSyntheticCandles({
-          seed,
-          endPrice:      Number(displayAsset?.price || 0),
-          candleMs:      timeframeMs,
-          count:         1000,
-          baseVolatility: 0.002,
-        });
-        setCandles(fallback);
+        setCandles(buildSyntheticCandles({ seed: hashCurrency(`${assetType}:${assetId}`), endPrice: Number(displayAsset?.price || 0), candleMs: timeframeMs }));
         setHistoryReady(true);
       }
     };
-
     loadHistory();
     return () => { mounted = false; };
-  }, [
-    assetType,
-    historyKey,
-    displayAsset?.id,
-    displayAsset?.name,
-    displayAsset?.quoteVolume,
-    tfConfig.binanceInterval,
-    tfConfig.value,
-    timeframeMs,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    currencyBase,
-  ]);
+  }, [assetType, historyKey, displayAsset, tfConfig, timeframeMs, currencyBase, assetId, timeframe]);
 
-  // ── Live candle stitching ───────────────────────────────────────────────────
+  // Live candle stitcher overwatch loop
   useEffect(() => {
-    if (!historyReady) return;
-    const price = Number(displayAsset?.price);
-    if (!displayAsset || !Number.isFinite(price) || price <= 0) return;
+    if (!historyReady || !displayAsset || !timeframeMs) return;
+    const price = Number(displayAsset.price);
+    if (!Number.isFinite(price) || price <= 0) return;
 
-    const now    = Date.now();
-    const bucket = Math.floor(now / timeframeMs) * timeframeMs;
+    const bucket = Math.floor(Date.now() / timeframeMs) * timeframeMs;
 
     setCandles((prev) => {
-      if (!Array.isArray(prev) || prev.length === 0) {
-        return [{ t: bucket, open: price, high: price, low: price, close: price }];
-      }
-      const last      = prev[prev.length - 1];
-      const lastTime  = Number(last?.t);
-      const lastClose = Number(last?.close);
-      const openFallback = Number.isFinite(lastClose) && lastClose > 0 ? lastClose : price;
+      if (!Array.isArray(prev) || prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      if (!last) return prev;
 
-      if (Number.isFinite(lastTime) && lastTime === bucket) {
-        const updated = {
-          ...last,
-          close: price,
-          high:  Math.max(Number(last.high) || price, price),
-          low:   Math.min(Number(last.low)  || price, price),
-        };
-        return [...prev.slice(0, -1), updated];
+      if (Number(last.t) === bucket) {
+        return [...prev.slice(0, -1), { ...last, close: price, high: Math.max(Number(last.high) || price, price), low: Math.min(Number(last.low) || price, price) }];
       }
-
-      const open  = openFallback;
-      const close = price;
-      const high  = Math.max(open, close);
-      const low   = Math.min(open, close);
-      const next  = [...prev, { t: bucket, open, high, low, close }];
-      return next.slice(-5000);
+      return [...prev, { t: bucket, open: last.close, high: price, low: price, close: price }].slice(-2000);
     });
   }, [displayAsset, historyReady, tick, timeframeMs]);
 
-  // ── Derived display values ──────────────────────────────────────────────────
-  const quoteCurrency = displayAsset?.type === 'currency' &&
-    typeof displayAsset.quoteCurrency === 'string' ? displayAsset.quoteCurrency : '';
+  const quoteCurrency = displayAsset?.type === 'currency' && typeof displayAsset.quoteCurrency === 'string' ? displayAsset.quoteCurrency : '';
 
   const balanceInQuote = useMemo(() => {
-    if (assetType !== 'currency' || !quoteCurrency) return balance;
-    const usdPerBase   = quoteCurrency === 'USD' ? 1 : Number(currencyRates?.usd);
-    const okUsdPerBase = Number.isFinite(usdPerBase) && usdPerBase > 0 ? usdPerBase : null;
-    if (!okUsdPerBase) return balance;
-    return balance / okUsdPerBase;
-  }, [assetType, balance, currencyRates?.usd, quoteCurrency]);
+    if (assetType !== 'currency' || !quoteCurrency) return activeUserBalance;
+    const usdPerBase = quoteCurrency === 'USD' ? 1 : Number(currencyRates?.usd || 1);
+    return activeUserBalance / usdPerBase;
+  }, [assetType, activeUserBalance, currencyRates?.usd, quoteCurrency]);
 
-  const headerTitle = useMemo(() => {
-    if (!displayAsset) return 'Asset';
-    if (displayAsset.type === 'currency' && quoteCurrency)
-      return `${displayAsset.name} / ${quoteCurrency.toUpperCase()}`;
-    return displayAsset.name;
-  }, [displayAsset, quoteCurrency]);
-
-  const headerPrice = useMemo(() => {
-    if (!displayAsset) return '...';
-    const price = Number(displayAsset.price);
-    if (!Number.isFinite(price) || price <= 0) return '...';
-    if (displayAsset.type === 'currency' && quoteCurrency)
-      return `${price.toLocaleString('en-US', { maximumFractionDigits: 6 })} ${quoteCurrency.toUpperCase()}`;
-    return `$${price.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
-  }, [displayAsset, quoteCurrency]);
-
-  const change24h = Number(displayAsset?.change24h);
-  const changeStr = Number.isFinite(change24h)
-    ? `${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}%`
-    : null;
+  if (!historyReady || !displayAsset || candles.length === 0) {
+    return (
+      <section className="surface" style={{ display: 'grid', placeItems: 'center', minHeight: '500px' }}>
+        <div className="empty-state">Synchronizing secure asset data feeds...</div>
+      </section>
+    );
+  }
 
   return (
     <section className="section-list">
@@ -567,179 +454,242 @@ function AssetDetailPage() {
             ← Back
           </button>
         </div>
-
         <div className="hero" style={{ marginBottom: 16 }}>
-          <h2 style={{ marginBottom: 4 }}>{headerTitle}</h2>
+          <h2 style={{ marginBottom: 4 }}>{displayAsset.type === 'currency' && quoteCurrency ? `${displayAsset.name} / ${quoteCurrency.toUpperCase()}` : displayAsset.name}</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span className="price">{headerPrice}</span>
-            {changeStr && (
-              <span className={`asset-meta ${change24h >= 0 ? 'positive' : 'negative'}`}>
-                {changeStr}
+            <span className="price">{displayAsset.type === 'currency' && quoteCurrency ? `${Number(displayAsset.price).toFixed(4)} ${quoteCurrency.toUpperCase()}` : `$${Number(displayAsset.price).toFixed(2)}`}</span>
+            {Number.isFinite(displayAsset.change24h) && (
+              <span className={`asset-meta ${displayAsset.change24h >= 0 ? 'positive' : 'negative'}`}>
+                {displayAsset.change24h >= 0 ? '+' : ''}{Number(displayAsset.change24h).toFixed(2)}%
               </span>
             )}
           </div>
-          {assetType === 'currency' && (
-            <p className="asset-meta" style={{ marginTop: 4 }}>Status: {currencyStatus}</p>
-          )}
         </div>
 
-        {/* ── Timeframe pill selector ─────────────────────────────────────── */}
-        <div className="tf-row">
-          {TIMEFRAMES.map((tf) => (
-            <button
-              key={tf.value}
-              type="button"
-              className={`tf-pill${timeframe === tf.value ? ' tf-pill--active' : ''}`}
-              onClick={() => setTimeframe(tf.value)}
-            >
-              {tf.label}
-            </button>
-          ))}
-        </div>
-
-        <CandleChart candles={candles} />
-      </div>
-      
-      <div className="surface">
-        <h3>Your Active {displayAsset?.name} Positions</h3>
-        {activeAssetHoldings.length === 0 ? (
-          <div className="empty-state">
-            You do not hold any active spot shares or open futures contracts for this asset.
+        {/* ── RECONFIGURED TIME CONTROLS WITH MULTI-INSTANCE ADD/EDIT CONTROLLER ── */}
+        <div className="tf-row" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {TIMEFRAMES.map((tf) => (
+              <button key={tf.value} type="button" className={`tf-pill ${timeframe === tf.value ? 'tf-pill--active' : ''}`} onClick={() => setTimeframe(tf.value)}>
+                {tf.label}
+              </button>
+            ))}
           </div>
+
+          <div style={{ position: 'relative' }}>
+            <button 
+              type="button" 
+              className="tf-pill" 
+              style={{ borderColor: activeIndicators.length > 0 ? 'var(--accent)' : 'var(--border)', color: activeIndicators.length > 0 ? 'var(--accent)' : 'var(--text)' }}
+              onClick={() => setShowIndicatorMenu(!showIndicatorMenu)}
+            >
+              📊 Analysis Tools {activeIndicators.length > 0 ? `(${activeIndicators.length})` : ''}
+            </button>
+
+            {showIndicatorMenu && (
+              <div 
+                className="helper-box" 
+                style={{ 
+                  position: 'absolute', right: 0, top: '40px', zIndex: 110, width: '330px', 
+                  background: 'rgba(7, 17, 31, 0.98)', backdropFilter: 'blur(10px)',
+                  boxShadow: 'var(--shadow)', padding: '14px', display: 'grid', gap: '10px',
+                  maxHeight: '480px', overflowY: 'auto'
+                }}
+              >
+                <strong style={{ fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase' }}>Add Chart Tools</strong>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <button type="button" className="primary-button" style={{ fontSize: '0.75rem', padding: '6px 10px', flex: '1 1 auto' }} onClick={() => addIndicatorInstance('ma')}>+ MA</button>
+                  <button type="button" className="primary-button" style={{ fontSize: '0.75rem', padding: '6px 10px', flex: '1 1 auto' }} onClick={() => addIndicatorInstance('bb')}>+ Bands</button>
+                  <button type="button" className="primary-button" style={{ fontSize: '0.75rem', padding: '6px 10px', flex: '1 1 auto' }} onClick={() => addIndicatorInstance('rsi')}>+ RSI</button>
+                  <button type="button" className="primary-button" style={{ fontSize: '0.75rem', padding: '6px 10px', flex: '1 1 auto' }} onClick={() => addIndicatorInstance('macd')}>+ MACD</button>
+                </div>
+
+                {activeIndicators.length > 0 && (
+                  <>
+                    <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+                    <strong style={{ fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase' }}>Active Chart Layers</strong>
+                    
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      {activeIndicators.map((ind) => (
+                        <div 
+                          key={ind.id} 
+                          style={{ 
+                            background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', 
+                            borderRadius: '8px', padding: '8px', display: 'grid', gap: '6px' 
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: ind.color }}>
+                              {ind.type === 'ma' && '🎨 Moving Average'}
+                              {ind.type === 'bb' && '░ Bollinger Bands'}
+                              {ind.type === 'rsi' && '⚛ Relative Strength Index (RSI)'}
+                              {ind.type === 'macd' && '⚡ MACD'}
+                            </span>
+                            <button 
+                              type="button" 
+                              style={{ background: 'transparent', border: 0, color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem' }}
+                              onClick={() => removeIndicatorInstance(ind.id)}
+                            >
+                              ✕ Remove
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', flexWrap: 'wrap' }}>
+                            {/* Standard single parameter configuration fields */}
+                            {(ind.type === 'ma' || ind.type === 'bb' || ind.type === 'rsi') && (
+                              <label style={{ flex: '1 1 70px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                Period
+                                <input 
+                                  type="number" 
+                                  className="market-search-input"
+                                  style={{ padding: '4px 6px', fontSize: '0.8rem' }}
+                                  min="2" max="500"
+                                  value={ind.period} 
+                                  onChange={(e) => updateIndicatorParameter(ind.id, 'period', Math.max(2, Number(e.target.value)))}
+                                />
+                              </label>
+                            )}
+
+                            {/* Bollinger Standard Deviation variables */}
+                            {ind.type === 'bb' && (
+                              <label style={{ flex: '1 1 70px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                Std Dev
+                                <input 
+                                  type="number" 
+                                  className="market-search-input"
+                                  style={{ padding: '4px 6px', fontSize: '0.8rem' }}
+                                  min="0.5" max="5" step="0.5"
+                                  value={ind.stdDev} 
+                                  onChange={(e) => updateIndicatorParameter(ind.id, 'stdDev', Number(e.target.value))}
+                                />
+                              </label>
+                            )}
+
+                            {/* Triple Parameter parameters unique to MACD */}
+                            {ind.type === 'macd' && (
+                              <>
+                                <label style={{ flex: '1 1 50px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  Fast
+                                  <input type="number" className="market-search-input" style={{ padding: '4px 6px', fontSize: '0.8rem' }} min="3" max="100" value={ind.fast} onChange={(e) => updateIndicatorParameter(ind.id, 'fast', Number(e.target.value))} />
+                                </label>
+                                <label style={{ flex: '1 1 50px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  Slow
+                                  <input type="number" className="market-search-input" style={{ padding: '4px 6px', fontSize: '0.8rem' }} min="5" max="200" value={ind.slow} onChange={(e) => updateIndicatorParameter(ind.id, 'slow', Number(e.target.value))} />
+                                </label>
+                                <label style={{ flex: '1 1 50px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  Signal
+                                  <input type="number" className="market-search-input" style={{ padding: '4px 6px', fontSize: '0.8rem' }} min="2" max="50" value={ind.signal} onChange={(e) => updateIndicatorParameter(ind.id, 'signal', Number(e.target.value))} />
+                                </label>
+                              </>
+                            )}
+
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginLeft: 'auto' }}>
+                              Color
+                              <input 
+                                type="color" 
+                                style={{ width: '28px', height: '22px', border: 0, padding: 0, background: 'transparent', cursor: 'pointer' }}
+                                value={ind.color} 
+                                onChange={(e) => updateIndicatorParameter(ind.id, 'color', e.target.value)}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button type="button" className="secondary-button" style={{ fontSize: '0.7rem', padding: '6px', marginTop: '4px' }} onClick={() => setActiveIndicators([])}>
+                      Clear All Tools
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <CandleChart candles={candles} activeIndicators={activeIndicators} />
+      </div>
+
+      {/* ─── ACTIVE POSITIONS ELEMENT PANEL ─── */}
+      <div className="surface">
+        <h3>Your Active {displayAsset.name} Positions</h3>
+        {activeAssetHoldings.length === 0 ? (
+          <div className="empty-state">You do not hold any active spot positions or open futures contracts.</div>
         ) : (
           <div className="section-list">
             {activeAssetHoldings.map((holding) => {
               const isFutures = holding.instrumentType === 'futures';
-              const pnl = holding.unrealizedPnL || 0;
               const isEditing = editingPositionId === holding.id;
 
+              let displayPnL = 0;
+              let totalDisplayValue = 0;
+
+              if (isFutures) {
+                displayPnL = holding.unrealizedPnL || 0;
+                totalDisplayValue = (holding.margin || 0) + displayPnL;
+              } else {
+                totalDisplayValue = (holding.quantity || 0) * Number(holding.currentPrice || 0);
+                const costBasis = (holding.quantity || 0) * Number(holding.averagePrice || 0);
+                displayPnL = totalDisplayValue - costBasis;
+              }
+
+              const pnlClass = displayPnL >= 0 ? 'positive' : 'negative';
+              const pnlSign = displayPnL >= 0 ? '+' : '';
+
               return (
-                <div 
-                  key={holding.id}
-                  className="section-list"
-                  style={{ 
-                    background: 'rgba(255, 255, 255, 0.01)',
-                    padding: '12px',
-                    borderRadius: '16px',
-                    border: '1px solid var(--border)',
-                    marginBottom: '8px'
-                  }}
-                >
-                  <div 
-                    className="list-item" 
-                    style={{ 
-                      border: '0', 
-                      background: 'transparent', 
-                      padding: 0,
-                      borderLeft: `4px solid ${isFutures ? 'var(--auth-accent)' : 'var(--accent)'}`,
-                      paddingLeft: '12px'
-                    }}
-                  >
+                <div key={holding.id} className="section-list" style={{ background: 'rgba(255, 255, 255, 0.01)', padding: '12px', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '8px' }}>
+                  <div className="list-item" style={{ border: '0', background: 'transparent', padding: 0, borderLeft: `4px solid ${isFutures ? 'var(--auth-accent)' : 'var(--accent)'}`, paddingLeft: '12px' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <strong style={{ textTransform: 'uppercase' }}>
-                          {holding.symbol}
-                        </strong>
+                        <strong style={{ textTransform: 'uppercase' }}>{holding.symbol}</strong>
                         <span className="auth-pill" style={{ fontSize: '0.65rem', padding: '2px 8px' }}>
                           {isFutures ? `${holding.direction.toUpperCase()} ${holding.leverage}x FUTURES` : 'SPOT'}
                         </span>
                       </div>
-                      
                       <small style={{ marginTop: '4px', display: 'block' }}>
-                        Size: {holding.quantity} | Avg Entry: ${holding.averagePrice.toFixed(2)}
+                        {isFutures 
+                          ? `Size: ${holding.quantity || 0} | Avg Entry: $${Number(holding.averagePrice || 0).toFixed(2)} | Current: $${Number(holding.currentPrice || 0).toFixed(2)}`
+                          : `Quantity: ${holding.quantity || 0} | Avg Cost: $${Number(holding.averagePrice || 0).toFixed(2)} | Current Price: $${Number(holding.currentPrice || 0).toFixed(2)}`
+                        }
                       </small>
-                      
-                      {/* Live Risk trigger displays */}
                       {isFutures && (
                         <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <small style={{ color: 'var(--danger)' }}>
-                            ⚠️ Liquidation Price: ${holding.liquidationPrice?.toFixed(2)}
-                          </small>
-                          <small style={{ color: holding.takeProfit ? 'var(--accent)' : 'var(--muted)' }}>
-                            🎯 Take Profit Target: {holding.takeProfit ? `$${holding.takeProfit.toFixed(2)}` : 'None Configured'}
-                          </small>
-                          <small style={{ color: holding.stopLoss ? '#ff9e9e' : 'var(--muted)' }}>
-                            🛑 Stop Loss Safety: {holding.stopLoss ? `$${holding.stopLoss.toFixed(2)}` : 'None Configured'}
-                          </small>
+                          <small style={{ color: 'var(--danger)' }}>⚠️ Liquidation Price: ${Number(holding.liquidationPrice || 0).toFixed(2)}</small>
+                          <small style={{ color: holding.takeProfit ? 'var(--accent)' : 'var(--muted)' }}>🎯 Take Profit Target: {holding.takeProfit ? `$${Number(holding.takeProfit).toFixed(2)}` : 'None Configured'}</small>
+                          <small style={{ color: holding.stopLoss ? '#ff9e9e' : 'var(--muted)' }}>🛑 Stop Loss Safety: {holding.stopLoss ? `$${Number(holding.stopLoss).toFixed(2)}` : 'None Configured'}</small>
                         </div>
                       )}
                     </div>
-
-                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {isFutures ? (
-                        <>
-                          <strong className={pnl >= 0 ? 'positive' : 'negative'}>
-                            {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
-                          </strong>
-                          <button 
-                            type="button" 
-                            className="tf-pill" 
-                            style={{ fontSize: '0.7rem', padding: '3px 8px', alignSelf: 'flex-end' }}
-                            onClick={() => handleOpenModifier(holding)}
-                          >
-                            ⚙️ Edit Limits
-                          </button>
-                        </>
-                      ) : (
-                        <strong>${(holding.quantity * holding.currentPrice).toFixed(2)}</strong>
+                    
+                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <strong>${totalDisplayValue.toFixed(2)}</strong>
+                      <span className={pnlClass} style={{ fontSize: '0.8rem', fontWeight: '600' }}>
+                        {pnlSign}${displayPnL.toFixed(2)} PnL
+                      </span>
+                      {isFutures && !isEditing && (
+                        <button type="button" className="tf-pill" style={{ fontSize: '0.7rem', padding: '3px 8px', alignSelf: 'flex-end', marginTop: '4px' }} onClick={() => handleOpenModifier(holding)}>
+                          ⚙️ Edit Limits
+                        </button>
                       )}
                     </div>
                   </div>
 
-                  {/* Dynamic interactive inline modification tray menu */}
                   {isFutures && isEditing && (
-                    <div 
-                      className="helper-box" 
-                      style={{ 
-                        marginTop: '12px', 
-                        background: 'rgba(2, 8, 20, 0.8)', 
-                        borderColor: 'var(--border)',
-                        display: 'grid',
-                        gap: '10px'
-                      }}
-                    >
-                      <strong style={{ fontSize: '0.85rem', color: 'var(--text)' }}>Modify Triggers for contract</strong>
+                    <div className="helper-box" style={{ marginTop: '12px', background: 'rgba(2, 8, 20, 0.8)', borderColor: 'var(--border)', display: 'grid', gap: '10px' }}>
+                      <strong style={{ fontSize: '0.85rem' }}>Modify Triggers</strong>
                       <div style={{ display: 'flex', gap: '10px' }}>
                         <label style={{ flex: 1, fontSize: '0.8rem', display: 'grid', gap: '4px' }}>
                           Take Profit Price ($)
-                          <input
-                            type="number"
-                            className="market-search-input"
-                            style={{ padding: '6px 10px', fontSize: '0.85rem' }}
-                            value={localTP}
-                            placeholder="Deactivate target"
-                            onChange={(e) => setLocalTP(e.target.value)}
-                          />
+                          <input type="number" className="market-search-input" style={{ padding: '6px 10px', fontSize: '0.85rem' }} value={localTP} onChange={(e) => setLocalTP(e.target.value)} />
                         </label>
                         <label style={{ flex: 1, fontSize: '0.8rem', display: 'grid', gap: '4px' }}>
                           Stop Loss Price ($)
-                          <input
-                            type="number"
-                            className="market-search-input"
-                            style={{ padding: '6px 10px', fontSize: '0.85rem' }}
-                            value={localSL}
-                            placeholder="Deactivate limits"
-                            onChange={(e) => setLocalSL(e.target.value)}
-                          />
+                          <input type="number" className="market-search-input" style={{ padding: '6px 10px', fontSize: '0.85rem' }} value={localSL} onChange={(e) => setLocalSL(e.target.value)} />
                         </label>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
-                        <button 
-                          type="button" 
-                          className="ghost-button" 
-                          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                          onClick={() => setEditingPositionId(null)}
-                        >
-                          Cancel
-                        </button>
-                        <button 
-                          type="button" 
-                          className="primary-button" 
-                          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                          onClick={() => handleSaveTriggers(holding.id)}
-                        >
-                          Save Changes
-                        </button>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button type="button" className="ghost-button" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => setEditingPositionId(null)}>Cancel</button>
+                        <button type="button" className="primary-button" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => handleSaveTriggers(holding.id)}>Save Changes</button>
                       </div>
                     </div>
                   )}
@@ -755,41 +705,17 @@ function AssetDetailPage() {
         balance={balanceInQuote}
         quoteCurrency={assetType === 'currency' ? quoteCurrency : ''}
         onClose={() => navigate(-1)}
-        
-        // ─── UPGRADED FUTURES-AWARE BUY HANDLER ───
         onBuy={(amount, type, options) => {
           if (!displayAsset) return;
-          
-          let targetAsset = { ...displayAsset };
-          // Keep your special currency fallback parsing logic if applicable
-          if (displayAsset.type === 'currency' && Number.isFinite(displayAsset.priceUsd)) {
-            targetAsset.price = displayAsset.priceUsd;
-          }
-          
-          // Pass all parameters to the store
-          buyAsset({ 
-            asset: targetAsset, 
-            amount, 
-            instrumentType: type, 
-            futuresOptions: options 
-          });
+          let target = { ...displayAsset };
+          if (displayAsset.type === 'currency' && Number.isFinite(displayAsset.priceUsd)) target.price = displayAsset.priceUsd;
+          buyAsset({ asset: target, amount, instrumentType: type, futuresOptions: options });
         }}
-
-        // ─── UPGRADED FUTURES-AWARE SELL HANDLER ───
         onSell={(amount, type, options) => {
           if (!displayAsset) return;
-          
-          let targetAsset = { ...displayAsset };
-          if (displayAsset.type === 'currency' && Number.isFinite(displayAsset.priceUsd)) {
-            targetAsset.price = displayAsset.priceUsd;
-          }
-          
-          // Pass all parameters to the store
-          sellAsset({ 
-            asset: targetAsset, 
-            amount, 
-            instrumentType: type 
-          });
+          let target = { ...displayAsset };
+          if (displayAsset.type === 'currency' && Number.isFinite(displayAsset.priceUsd)) target.price = displayAsset.priceUsd;
+          sellAsset({ asset: target, amount, instrumentType: type });
         }}
       />
     </section>
