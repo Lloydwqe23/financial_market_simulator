@@ -11,18 +11,15 @@ import ProfilePage from './pages/ProfilePage';
 import { usePortfolioStore } from './store/portfolioStore';
 import { useAuthStore } from './store/authStore';
 
-
-
 function ToastNotification() {
   const lastMessage = usePortfolioStore((state) => state.lastMessage);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // Prevent showing the initial welcome state string on mount
     if (!lastMessage || lastMessage.includes('Start by buying')) return;
 
     setVisible(true);
-    const timer = setTimeout(() => setVisible(false), 4500); // Auto-dismiss after 4.5s
+    const timer = setTimeout(() => setVisible(false), 4500);
 
     return () => clearTimeout(timer);
   }, [lastMessage]);
@@ -46,7 +43,6 @@ function ToastNotification() {
     </div>
   );
 }
-
 
 function App() {
   const balance = usePortfolioStore((state) => state.balance);
@@ -75,32 +71,29 @@ function App() {
             <span>Holdings</span>
             <strong>{holdingsCount}</strong>
           </div>
-          <div className="topbar-user">
-            {user ? (
-              <div className="user-controls">
-                <NavLink to="/profile" className="user-link">
-                  <div className="user-avatar">{userInitial}</div>
-                  <div className="user-text">
-                    <div className="user-label">Signed in</div>
-                    <div className="user-name">{user.email}</div>
-                  </div>
-                </NavLink>
-                <button type="button" className="ghost-button" onClick={logout}>
-                  Sign out
-                </button>
-              </div>
-            ) : (
+          {user ? (
+            <div className="topbar-stats-user-card">
+              <NavLink to="/profile" className="user-link">
+                <div className="user-avatar">{userInitial}</div>
+                <div className="user-text">
+                  <div className="user-label">Signed in</div>
+                  <div className="user-name">{user.email}</div>
+                </div>
+              </NavLink>
+              <button type="button" className="ghost-button" onClick={logout}>
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <div className="topbar-stats-user-card" style={{ justifyContent: 'center' }}>
               <NavLink to="/login" className="auth-link">
                 <svg className="auth-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path
-                    fill="currentColor"
-                    d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5Zm0 2c-4.42 0-8 2.01-8 4.5V21h16v-2.5c0-2.49-3.58-4.5-8-4.5Z"
-                  />
+                  <path fill="currentColor" d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5Zm0 2c-4.42 0-8 2.01-8 4.5V21h16v-2.5c0-2.49-3.58-4.5-8-4.5Z" />
                 </svg>
                 <div className="auth-link-text">Sign in</div>
               </NavLink>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </header>
 

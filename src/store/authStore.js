@@ -26,7 +26,6 @@ function writeStoredAuth(user, token) {
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ email: user.email, token: token ?? null }));
   } catch (e) {
-    // ignore storage errors
   }
 }
 
@@ -79,7 +78,6 @@ export const useAuthStore = create((set, get) => ({
       writeStoredAuth(user, data.token);
       set({ user, token: data.token, loading: false });
 
-      // hydrate portfolio after login
       try {
         const pRes = await fetch('/api/portfolio', { credentials: 'include' });
         if (pRes.ok) {
@@ -95,7 +93,6 @@ export const useAuthStore = create((set, get) => ({
           }
         }
       } catch (e) {
-        // ignore
       }
       return true;
     } catch (e) {
@@ -107,7 +104,6 @@ export const useAuthStore = create((set, get) => ({
     try {
       await fetch('/api/logout', { method: 'POST', credentials: 'include' });
     } catch (e) {
-      // ignore
     }
     writeStoredAuth(null, null);
     set({ user: null, token: null });
@@ -131,7 +127,6 @@ export const useAuthStore = create((set, get) => ({
       const user = { email: data.email };
       const token = get().token;
       writeStoredAuth(user, token);
-      // if server returned portfolio, hydrate store
       if (data.portfolio) {
         usePortfolioStore.setState({
           balance: data.portfolio.balance,

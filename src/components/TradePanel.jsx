@@ -37,9 +37,8 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
     return `$${numericValue.toFixed(2)}`;
   };
 
-  // ── CENTRALIZED EXECUTION PIPELINE ──
   const handleTradeSubmit = (event, actionType) => {
-    event.preventDefault(); // Stop standard form submission
+    event.preventDefault();
     
     if (!authUser) {
       navigate('/login');
@@ -47,11 +46,9 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
     }
 
     if (instrumentType === 'stock') {
-      // FIX: Pass empty options object ({}) as the 3rd parameter so the store doesn't crash reading 'undefined'
       if (actionType === 'buy') onBuy(amountNumber, 'stock', {});
       if (actionType === 'sell') onSell(amountNumber, 'stock', {});
     } else {
-      // Futures trades pass the full options payload
       onBuy(amountNumber, 'futures', {
         direction,
         leverage,
@@ -92,7 +89,6 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
       <form className="trade-form" onSubmit={(e) => e.preventDefault()}>
         {instrumentType === 'futures' && (
           <>
-            {/* Position Direction Controls */}
             <div className="tf-row" style={{ marginBottom: '10px' }}>
               <button
                 type="button"
@@ -112,7 +108,6 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
               </button>
             </div>
 
-            {/* Leverage Slider adjustment */}
             <label>
               Leverage Options: {leverage}x
               <input
@@ -125,7 +120,6 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
               />
             </label>
 
-            {/* Stop Target fields */}
             <div style={{ display: 'flex', gap: '10px', margin: '8px 0' }}>
               <label style={{ flex: 1 }}>
                 Take Profit Price
@@ -169,7 +163,6 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
         <div className="trade-actions" style={{ marginTop: '14px' }}>
           {instrumentType === 'stock' ? (
             <>
-              {/* Force buttons to type="button" to prevent generic form triggers */}
               <button type="button" className="primary-button" onClick={(e) => handleTradeSubmit(e, 'buy')} disabled={!authUser}>
                 Buy Spot
               </button>

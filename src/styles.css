@@ -54,7 +54,7 @@ button {
 .topbar {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   gap: 24px;
   margin-bottom: 20px;
 }
@@ -74,11 +74,13 @@ h1 {
 
 .topbar-stats {
   display: flex;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
 }
 
 .topbar-stats > div,
+.topbar-stats-user-card,
 .nav,
 .surface {
   background: var(--panel);
@@ -88,9 +90,18 @@ h1 {
 }
 
 .topbar-stats > div {
-  min-width: 170px;
+  min-width: 140px;
   padding: 14px 16px;
   border-radius: 18px;
+}
+
+.topbar-stats-user-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 18px;
+  border-radius: 18px;
+  min-width: 320px;
 }
 
 .topbar-stats span {
@@ -102,17 +113,6 @@ h1 {
 
 .topbar-stats strong {
   font-size: 1.15rem;
-}
-
-.topbar-user {
-  min-width: 220px;
-}
-
-.user-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
 }
 
 .auth-link {
@@ -704,10 +704,6 @@ h1 {
   .auth-card {
     grid-template-columns: 1fr;
   }
-
-  .topbar-user {
-    width: 100%;
-  }
 }
 
 @media (max-width: 640px) {
@@ -766,7 +762,6 @@ h1 {
   color: var(--accent);
 }
  
-/* ── Chart scrollbar ────────────────────────────────────────────────────────── */
 .chart-scrollbar {
   position: relative;
   height: 4px;
@@ -853,7 +848,6 @@ h1 {
   box-shadow: 0 0 0 3px rgba(66, 211, 146, 0.12);
 }
  
-/* Hide number input spinners */
 .deposit-input::-webkit-outer-spin-button,
 .deposit-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -862,7 +856,6 @@ h1 {
   -moz-appearance: textfield;
 }
 
-/* ── Filter & Search Toolbar Styles ────────────────────────────────────────── */
 .market-toolbar {
   display: flex;
   flex-direction: column;
@@ -900,7 +893,6 @@ h1 {
   flex-wrap: wrap;
 }
 
-/* Custom select styling matching your existing .chart-controls select */
 .market-select {
   border: 1px solid var(--border);
   background: rgba(2, 8, 20, 0.7);

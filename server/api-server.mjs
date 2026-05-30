@@ -1,46 +1,49 @@
 import 'dotenv/config';
 
 import http from 'node:http';
-import { URL, fileURLToPath } from 'node:url';
-import path from 'node:path';
+import { URL } from 'node:url';
 import crypto from 'node:crypto';
-import fs from 'node:fs';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import mysql from 'mysql2/promise';
 
 const AUTH_SECRET = process.env.AUTH_SECRET || 'dev-secret';
-
 const HOST = process.env.API_HOST || '127.0.0.1';
 const PORT = Number(process.env.API_PORT) || 8787;
 
-// Persistence
-const jsonPath = path.join(__dirname, 'market.json');
-let store = { nextUserId: 1, users: [], sessions: {}, portfolios: {} };
-try {
-  if (fs.existsSync(jsonPath)) {
-    const raw = fs.readFileSync(jsonPath, 'utf8');
-    store = JSON.parse(raw);
-  }
-} catch (e) {
-  console.warn('Failed to read JSON store, starting fresh');
-}
-
-function persistStore() {
-  try {
-    fs.writeFileSync(jsonPath, JSON.stringify(store, null, 2), 'utf8');
-  } catch (e) {
-    console.warn('Failed to persist store', e);
-  }
-}
-
 function requiredEnv(name) {
   const value = process.env[name];
-  if (!value) throw new Error(`${name} is required when DB_DRIVER=mysql`);
+  if (!value) {
+    console.error(`FATAL CONFIGURATION ERROR: Environment variable "${name}" is missing.`);
+    process.exit(1);
+  }
   return value;
 }
 
-async function ensureMySqlSchema(pool) {
+const dbName = requiredEnv('MYSQL_DATABASE');
+const dbHost = process.env.MYSQL_HOST || '127.0.0.1';
+const dbPort = Number(process.env.MYSQL_PORT) || 3306;
+const dbUser = process.env.MYSQL_USER || 'root';
+const dbPassword = process.env.MYSQL_PASSWORD || '';
+
+const pool = mysql.createPool({
+  host: dbHost,
+  port: dbPort,
+  user: dbUser,
+  password: dbPassword,
+  database: dbName,
+  waitForConnections: true,
+  connectionLimit: 10,
+});
+
+try {
+  await pool.query('SELECT 1');
+  console.log(`Database Connected: MySQL (${dbHost}:${dbPort}/${dbName})`);
+} catch (error) {
+  console.error('FATAL SYSTEM ERROR: Failed to establish strict MySQL connection pooling core.');
+  console.error(error.message);
+  process.exit(1);
+}
+
+async function ensureMySqlSchema() {
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -76,155 +79,72 @@ async function ensureMySqlSchema(pool) {
   `);
 }
 
-function createMySqlStatements(pool) {
-  return {
-    insertUser: {
-      run: async (email, salt, hash, created_at) => {
-        const [result] = await pool.execute(
-          'INSERT INTO users (email, salt, hash, created_at) VALUES (?, ?, ?, ?)',
-          [email, salt, hash, created_at],
-        );
-        return { lastInsertRowid: result.insertId };
-      },
-    },
-    getUserByEmail: {
-      get: async (email) => {
-        const [rows] = await pool.execute(
-          'SELECT id, email, salt, hash, created_at FROM users WHERE email = ? LIMIT 1',
-          [email],
-        );
-        return rows[0];
-      },
-    },
-    insertSession: {
-      run: async (token, user_id, exp, created_at) => {
-        await pool.execute(
-          `INSERT INTO sessions (token, user_id, exp, created_at)
-           VALUES (?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), exp = VALUES(exp), created_at = VALUES(created_at)`,
-          [token, user_id, exp, created_at],
-        );
-      },
-    },
-    getSession: {
-      get: async (token) => {
-        const [rows] = await pool.execute(
-          `SELECT s.token, s.exp, s.user_id, u.email
-           FROM sessions s
-           JOIN users u ON u.id = s.user_id
-           WHERE s.token = ?
-           LIMIT 1`,
-          [token],
-        );
-        return rows[0];
-      },
-    },
-    deleteSession: {
-      run: async (token) => {
-        await pool.execute('DELETE FROM sessions WHERE token = ?', [token]);
-      },
-    },
-    getPortfolio: {
-      get: async (user_id) => {
-        const [rows] = await pool.execute('SELECT data FROM portfolios WHERE user_id = ? LIMIT 1', [user_id]);
-        return rows[0];
-      },
-    },
-    upsertPortfolio: {
-      run: async (user_id, data, updated_at) => {
-        await pool.execute(
-          `INSERT INTO portfolios (user_id, data, updated_at)
-           VALUES (?, ?, ?)
-           ON DUPLICATE KEY UPDATE data = VALUES(data), updated_at = VALUES(updated_at)`,
-          [user_id, data, updated_at],
-        );
-      },
-    },
-  };
-}
+await ensureMySqlSchema();
 
-let persistenceDriver = 'json';
-let closePersistence = async () => {};
-
-let statements = {
+const statements = {
   insertUser: {
     run: async (email, salt, hash, created_at) => {
-      const id = store.nextUserId++;
-      store.users.push({ id, email, salt, hash, created_at });
-      persistStore();
-      return { lastInsertRowid: id };
+      const [result] = await pool.execute(
+        'INSERT INTO users (email, salt, hash, created_at) VALUES (?, ?, ?, ?)',
+        [email, salt, hash, created_at],
+      );
+      return { lastInsertRowid: result.insertId };
     },
   },
   getUserByEmail: {
-    get: async (email) => store.users.find((u) => u.email === email) || undefined,
+    get: async (email) => {
+      const [rows] = await pool.execute(
+        'SELECT id, email, salt, hash, created_at FROM users WHERE email = ? LIMIT 1',
+        [email],
+      );
+      return rows[0];
+    },
   },
   insertSession: {
     run: async (token, user_id, exp, created_at) => {
-      store.sessions[token] = { token, user_id, exp, created_at };
-      persistStore();
+      await pool.execute(
+        `INSERT INTO sessions (token, user_id, exp, created_at)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), exp = VALUES(exp), created_at = VALUES(created_at)`,
+        [token, user_id, exp, created_at],
+      );
     },
   },
   getSession: {
     get: async (token) => {
-      const s = store.sessions[token];
-      if (!s) return undefined;
-      const user = store.users.find((u) => u.id === s.user_id);
-      return { token: s.token, exp: s.exp, user_id: s.user_id, email: user?.email };
+      const [rows] = await pool.execute(
+        `SELECT s.token, s.exp, s.user_id, u.email
+         FROM sessions s
+         JOIN users u ON u.id = s.user_id
+         WHERE s.token = ?
+         LIMIT 1`,
+        [token],
+      );
+      return rows[0];
     },
   },
   deleteSession: {
     run: async (token) => {
-      delete store.sessions[token];
-      persistStore();
+      await pool.execute('DELETE FROM sessions WHERE token = ?', [token]);
     },
   },
   getPortfolio: {
     get: async (user_id) => {
-      const p = store.portfolios[user_id];
-      if (!p) return undefined;
-      return { data: JSON.stringify(p) };
+      const [rows] = await pool.execute('SELECT data FROM portfolios WHERE user_id = ? LIMIT 1', [user_id]);
+      return rows[0];
     },
   },
   upsertPortfolio: {
     run: async (user_id, data, updated_at) => {
-      try {
-        store.portfolios[user_id] = JSON.parse(data);
-      } catch (e) {
-        store.portfolios[user_id] = {};
-      }
-      persistStore();
+      await pool.execute(
+        `INSERT INTO portfolios (user_id, data, updated_at)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE data = VALUES(data), updated_at = VALUES(updated_at)`,
+        [user_id, data, updated_at],
+      );
     },
   },
 };
-
-if (String(process.env.DB_DRIVER || '').toLowerCase() === 'mysql') {
-  try {
-    const mysql = await import('mysql2/promise');
-    const database = requiredEnv('MYSQL_DATABASE');
-    const pool = mysql.createPool({
-      host: process.env.MYSQL_HOST || '127.0.0.1',
-      port: Number(process.env.MYSQL_PORT) || 3306,
-      user: process.env.MYSQL_USER || 'root',
-      password: process.env.MYSQL_PASSWORD || '',
-      database,
-      waitForConnections: true,
-      connectionLimit: 10,
-    });
-
-    await pool.query('SELECT 1');
-    await ensureMySqlSchema(pool);
-
-    statements = createMySqlStatements(pool);
-    persistenceDriver = 'mysql';
-    closePersistence = async () => pool.end();
-    console.log(`Persistence: MySQL (${process.env.MYSQL_HOST || '127.0.0.1'}:${process.env.MYSQL_PORT || 3306}/${database})`);
-  } catch (e) {
-    console.warn('MySQL init failed, falling back to JSON store:', e?.message || e);
-    console.log(`Persistence: JSON (${jsonPath})`);
-  }
-} else {
-  console.log(`Persistence: JSON (${jsonPath})`);
-}
 
 const DEFAULT_PORTFOLIO = {
   balance: 10000,
@@ -269,14 +189,8 @@ function hashPassword(password, salt = null) {
   return { salt, hash };
 }
 
-function normalizeEmail(email) {
-  return String(email || '').trim().toLowerCase();
-}
-
 function normalizePortfolio(input) {
-  // If the incoming payload has a nested .portfolio key object, extract it safely
   const target = input?.portfolio ? input.portfolio : input;
-
   const balance = Number(target?.balance);
   
   const normalizedHoldings = Array.isArray(target?.holdings)
@@ -289,8 +203,6 @@ function normalizePortfolio(input) {
         currentPrice: Number(holding?.currentPrice || 0),
         type: String(holding?.type || 'crypto'),
         instrumentType: String(holding?.instrumentType || 'stock'),
-        
-        // Optional derivative contract parameters
         direction: holding?.direction ? String(holding.direction) : null,
         leverage: holding?.leverage ? Number(holding.leverage) : null,
         margin: holding?.margin ? Number(holding.margin) : null,
@@ -609,12 +521,9 @@ const server = http.createServer(async (req, res) => {
 
   if (requestUrl.pathname === '/api/health') {
     sendJson(res, req, 200, {
-      ok: true,
-      service: 'market-simulator-api',
+      status: 'healthy',
+      persistence: 'mysql',
       time: new Date().toISOString(),
-      host: HOST,
-      port: PORT,
-      persistence: persistenceDriver,
     });
     return;
   }
@@ -622,7 +531,6 @@ const server = http.createServer(async (req, res) => {
   if (requestUrl.pathname === '/api/stocks') {
     try {
       const { quotes, updatedAt } = await loadStockQuotesCached();
-
       sendJson(res, req, 200, {
         source: 'stooq-proxy',
         updatedAt,
@@ -662,7 +570,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Registration
   if (requestUrl.pathname === '/api/register' && req.method === 'POST') {
     try {
       const body = await readJsonBody(req);
@@ -694,7 +601,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Login
   if (requestUrl.pathname === '/api/login' && req.method === 'POST') {
     try {
       const body = await readJsonBody(req);
@@ -715,7 +621,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const exp = Date.now() + 1000 * 60 * 60 * 24; // 24h
+      const exp = Date.now() + 1000 * 60 * 60 * 24;
       const token = signToken({ email: normalizedEmail, exp });
       await statements.insertSession.run(token, stored.id, exp, Date.now());
 
@@ -728,7 +634,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Logout
   if (requestUrl.pathname === '/api/logout' && req.method === 'POST') {
     try {
       const cookies = parseCookies(req.headers.cookie);
@@ -742,7 +647,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Who am I
   if (requestUrl.pathname === '/api/me' && req.method === 'GET') {
     try {
       const session = await getSessionFromRequest(req);
@@ -758,7 +662,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Portfolio endpoints
   if (requestUrl.pathname === '/api/portfolio' && req.method === 'GET') {
     try {
       const session = await getSessionFromRequest(req);
@@ -808,15 +711,11 @@ async function shutdown(signal) {
 
   try {
     await new Promise((resolve) => server.close(() => resolve()));
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   try {
-    await closePersistence();
-  } catch {
-    // ignore
-  }
+    await pool.end();
+  } catch {}
 
   if (signal) {
     console.log(`Shutdown complete (${signal}).`);

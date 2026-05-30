@@ -10,7 +10,6 @@ function DashboardPage() {
   const [selectedAssetId, setSelectedAssetId] = useState(FALLBACK_ASSETS[0].id);
   const [status, setStatus] = useState('Loading market...');
   
-  // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'crypto' | 'stock'
   const [sortBy, setSortBy] = useState('none'); // 'none' | 'name' | 'changeHigh' | 'changeLow'
@@ -87,11 +86,9 @@ function DashboardPage() {
     };
   }, [syncMarketPrices]);
 
-  // Compute filtered and sorted assets dynamically
   const filteredAssets = useMemo(() => {
     let result = [...assets];
 
-    // 1. Text Search Filter
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase();
       result = result.filter(
@@ -101,12 +98,10 @@ function DashboardPage() {
       );
     }
 
-    // 2. Type Filter
     if (typeFilter !== 'all') {
       result = result.filter((asset) => asset.type === typeFilter);
     }
 
-    // 3. Sorting Rules
     if (sortBy === 'name') {
       result.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortBy === 'changeHigh') {
@@ -139,7 +134,6 @@ function DashboardPage() {
           <p className="asset-meta">Assets tracked: {assets.length}</p>
         </div>
 
-        {/* Toolbar Controls */}
         <div className="market-toolbar">
           <div className="search-wrapper">
             <input
@@ -152,7 +146,6 @@ function DashboardPage() {
           </div>
 
           <div className="filter-row-container">
-            {/* Type Filter using your beautiful active/inactive pill buttons */}
             <div className="tf-row" style={{ marginBottom: 0 }}>
               <button 
                 type="button"
@@ -177,7 +170,6 @@ function DashboardPage() {
               </button>
             </div>
 
-            {/* Dropdown sorting selector matches your native .chart-controls style */}
             <select 
               className="market-select"
               value={sortBy} 
@@ -208,7 +200,6 @@ function DashboardPage() {
           balance={balance}
           onClose={() => setSelectedAssetId('')}
           
-          // Update these two lines to pass all 3 parameters down to the Zustand store:
           onBuy={(amount, type, options) => 
             buyAsset({ 
               asset: selectedAsset, 

@@ -239,14 +239,12 @@ function AssetDetailPage() {
   const stockDailyCache = useRef(null);
   const stockDailyCacheId = useRef(null);
 
-  // ── NEW: DYNAMIC CONFIGURABLE INDICATORS INSTANCE STATE ARRAY ──
   const [activeIndicators, setActiveIndicators] = useState([]);
   const [showIndicatorMenu, setShowIndicatorMenu] = useState(false);
 
   const addIndicatorInstance = (type) => {
     const defaultColor = type === 'rsi' ? '#a855f7' : type === 'macd' ? '#06b6d4' : PRESET_COLORS[activeIndicators.length % PRESET_COLORS.length];
     
-    // Enforce uniqueness constraints on sub-panels to prevent double rendering
     if ((type === 'rsi' || type === 'macd') && activeIndicators.some(i => i.type === type)) {
       return; 
     }
@@ -274,7 +272,6 @@ function AssetDetailPage() {
     }));
   };
 
-  // Live positions filter with fallback string splitter validation
   const activeAssetHoldings = useMemo(() => {
     if (!Array.isArray(holdings)) return [];
     return holdings.filter((item) => {
@@ -294,7 +291,6 @@ function AssetDetailPage() {
     setHistoryReady(false);
   }, [assetId, assetType, currencyBase, timeframe]);
 
-  // Market fetching controller context loops
   useEffect(() => {
     let mounted   = true;
     let timerId   = 0;
@@ -360,7 +356,6 @@ function AssetDetailPage() {
 
   const historyKey = useMemo(() => `${assetType}:${assetId}:${timeframe}`, [assetId, assetType, timeframe]);
 
-  // History loader task loops
   useEffect(() => {
     let mounted = true;
     const loadHistory = async () => {
@@ -410,7 +405,6 @@ function AssetDetailPage() {
     return () => { mounted = false; };
   }, [assetType, historyKey, displayAsset, tfConfig, timeframeMs, currencyBase, assetId, timeframe]);
 
-  // Live candle stitcher overwatch loop
   useEffect(() => {
     if (!historyReady || !displayAsset || !timeframeMs) return;
     const price = Number(displayAsset.price);
@@ -466,7 +460,6 @@ function AssetDetailPage() {
           </div>
         </div>
 
-        {/* ── RECONFIGURED TIME CONTROLS WITH MULTI-INSTANCE ADD/EDIT CONTROLLER ── */}
         <div className="tf-row" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '14px' }}>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {TIMEFRAMES.map((tf) => (
@@ -535,7 +528,6 @@ function AssetDetailPage() {
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', flexWrap: 'wrap' }}>
-                            {/* Standard single parameter configuration fields */}
                             {(ind.type === 'ma' || ind.type === 'bb' || ind.type === 'rsi') && (
                               <label style={{ flex: '1 1 70px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 Period
@@ -550,7 +542,6 @@ function AssetDetailPage() {
                               </label>
                             )}
 
-                            {/* Bollinger Standard Deviation variables */}
                             {ind.type === 'bb' && (
                               <label style={{ flex: '1 1 70px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 Std Dev
@@ -565,7 +556,6 @@ function AssetDetailPage() {
                               </label>
                             )}
 
-                            {/* Triple Parameter parameters unique to MACD */}
                             {ind.type === 'macd' && (
                               <>
                                 <label style={{ flex: '1 1 50px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -610,7 +600,6 @@ function AssetDetailPage() {
         <CandleChart candles={candles} activeIndicators={activeIndicators} />
       </div>
 
-      {/* ─── ACTIVE POSITIONS ELEMENT PANEL ─── */}
       <div className="surface">
         <h3>Your Active {displayAsset.name} Positions</h3>
         {activeAssetHoldings.length === 0 ? (

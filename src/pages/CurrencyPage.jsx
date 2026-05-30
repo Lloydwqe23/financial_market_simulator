@@ -17,7 +17,6 @@ function CurrencyPage() {
   const [tick, setTick] = useState(0);
   const syncMarketPrices = usePortfolioStore((state) => state.syncMarketPrices);
 
-  // Search State
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -70,7 +69,6 @@ function CurrencyPage() {
     return typeof anchorRate === 'number' ? anchorRate : null;
   }, [rates.usd, selectedBase]);
 
-  // Generate cards
   const fxCards = useMemo(() => {
     if (!usdPerBase) return [];
 
@@ -102,7 +100,6 @@ function CurrencyPage() {
       .filter(Boolean);
   }, [changes, rates, selectedBase, tick, usdPerBase]);
 
-  // Client Filter applied on generated fxCards
   const filteredFxCards = useMemo(() => {
     if (searchQuery.trim() === '') return fxCards;
     const query = searchQuery.toLowerCase();
@@ -147,7 +144,6 @@ function CurrencyPage() {
         <p className="asset-meta">Currencies tracked: {CURRENCIES.length}</p>
       </div>
 
-      {/* ─── REPLACE OLD BASE SELECTOR CARDS WITH THIS TOOLBAR ─── */}
       <div className="market-toolbar">
         <div className="filter-row-container">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -176,7 +172,6 @@ function CurrencyPage() {
           </div>
         </div>
       </div>
-      {/* ─── END OF TOOLBAR UPDATE ─── */}
 
       <div className="grid-cards">
         {fxCards.length === 0 ? (

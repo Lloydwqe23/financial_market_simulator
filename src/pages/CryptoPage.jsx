@@ -9,7 +9,6 @@ function CryptoPage() {
   const loadCryptoAssets = useMarketStore((state) => state.loadCryptoAssets);
   const syncMarketPrices = usePortfolioStore((state) => state.syncMarketPrices);
 
-  // Search & Sort state
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('none');
 
@@ -42,7 +41,6 @@ function CryptoPage() {
     };
   }, [loadCryptoAssets, syncMarketPrices]);
 
-  // Compute local adjustments
   const filteredAssets = useMemo(() => {
     let result = [...assets];
 
@@ -79,7 +77,6 @@ function CryptoPage() {
         <p className="asset-meta">Coins tracked: {assets.length || '...'}</p>
       </div>
 
-      {/* Filter Toolbar */}
       <div className="market-toolbar">
         <div className="filter-row-container">
           <div className="search-wrapper" style={{ flex: 1 }}>

@@ -1,91 +1,81 @@
-# Market Simulator
+Market Simulator
+A React-based financial market and cryptocurrency trading simulation platform. This application provides a sandbox environment for tracking asset data, managing portfolios, and simulating spot and futures execution.
 
-React-курсова робота для симуляції фінансового ринку та крипто-трейдингу.
+Features
+Asset Tracking and Data Integration
+Cryptocurrency Feeds: Real-time price updates fetched via the Binance API, with an automatic fallback to the CoinGecko API to ensure constant uptime.
 
-## Функціональність
+Equity Markets: Real-time stock data delivered through a custom local API proxy routing directly to Stooq.
 
-- окремі сторінки для крипти, акцій, валют і портфоліо
-- глобальний стан через `Zustand`
-- live-крипта з Binance + CoinGecko fallback
-- live-акції через локальний API-проксі до Stooq
-- live-валюта через currency API з динамічними змінами відносно USD
-- форма купівлі/продажу та портфоліо з історією транзакцій
+Forex Matrix: Live currency exchange rates sourced via a specialized currency API, featuring dynamic fluctuation modeling calculated relative to a base USD value.
 
-## Запуск
+Interactive Charting Terminal: Custom-built HTML Canvas candle charts providing interactive zoom and pan controls, dynamic timeline scaling, live crosshair HUD tracking, and real-time technical analysis indicators (Simple Moving Averages and Bollinger Bands).
 
-```bash
+Trading Simulation Engine
+Account Ecosystem: Full support for secure user registration, session management, authenticated persistent portfolios, and initial paper-trading asset distributions.
+
+Execution Panel: Fully operational Spot market buy and sell triggers along with a high-leverage Futures trading desk.
+
+Risk Management Systems: Advanced architectural support for real-time portfolio risk overwatch loops, tracking live automated liquidations, Stop Loss targets, and Take Profit execution boundaries on a per-second baseline clock.
+
+Transaction Ledger: Comprehensive database archiving all incoming fund deposits, spot purchases, options closures, and historical liquidations.
+
+Architecture and State Management
+State Management: Core client states, account values, current token parameters, and active transactions are centralized using a unified Zustand memory store model.
+
+Data Persistence Engine: Built with a clean, dual-driver abstractions layer. The application saves layout states locally to an encrypted flat JSON ledger by default, but it can pivot seamlessly to an enterprise relational schema without forcing front-end logic overrides.
+
+Installation and Deployment
+Ensure you have Node.js installed on your local environment before proceeding.
+
+Standard Setup
+Install the necessary dependencies and initialize the development servers:
+
+Bash
 npm install
 npm run dev
-```
+The unified npm run dev script starts the Vite front-end client interface and launches the concurrent back-end micro-service responsible for data proxying and asset persistence.
 
-`npm run dev` запускає і Vite, і локальний API-сервер для акцій.
+Persistent Database Engine Configuration (Optional)
+By default, the application runs entirely standalone, persisting user credentials, authorization sessions, and asset portfolios locally into a JSON storage file located at server/market.json.
 
-## MySQL (optional)
+To scale up and pivot your configuration to a structured MySQL database instance, follow the initialization instructions below.
 
-By default the API persists users/sessions/portfolio into a local JSON file (`server/market.json`).
+1. Initialize the MySQL Instance
+Start your local database database service runner.
 
-To switch persistence to MySQL:
+On Windows (Native Service Install): Open PowerShell as an Administrator and execute:
 
-Note: the database is an external service. It is not “inside the repo”, so other people who clone from GitHub must run their own MySQL (or you deploy a shared backend + DB).
-
-0) Start a MySQL server.
-
-On Windows (service install), start it from **Services** (MySQL80) or run PowerShell as Administrator:
-
-```powershell
+PowerShell
 Start-Service MySQL80
-```
+Alternative Deployment via Docker (Recommended for cross-platform environments): A pre-configured container blueprint is included in the project root directory. Spin up a production-ready isolated MySQL image by running:
 
-1) Create a database (example):
-
-Important: this is **SQL** — run it inside MySQL (e.g. MySQL Workbench or the `mysql` CLI), not in PowerShell.
-
-```sql
-CREATE DATABASE market_simulator
-	CHARACTER SET utf8mb4
-	COLLATE utf8mb4_unicode_ci;
-```
-
-Example using the MySQL CLI:
-
-```bash
-mysql -u root -p
-```
-
-Then paste the SQL and run it.
-
-2) Create `.env` from `.env.example` and set:
-
-- `DB_DRIVER=mysql`
-- `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`
-
-### Option A: Docker (recommended for collaborators)
-
-This repo includes `docker-compose.yml` so anyone can start MySQL without installing it:
-
-```bash
+Bash
 docker compose up -d mysql
-```
+2. Prepare the Database Schema
+Access your preferred database command-line interface or administration tool (such as MySQL Workbench) and execute the structural creation query:
 
-Then copy `.env.example` to `.env`, set `DB_DRIVER=mysql`, and run:
+SQL
+CREATE DATABASE market_simulator
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+3. Bind Environmental Environment Variables
+Duplicate the distributed .env.example file to create a localized configurations environment file named .env:
 
-```bash
+Bash
+cp .env.example .env
+Open the newly created .env file and update your variables to route through the database driver:
+
+Code snippet
+DB_DRIVER=mysql
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_USER=your_username
+MYSQL_PASSWORD=your_secure_password
+MYSQL_DATABASE=market_simulator
+4. Run the Platform
+Launch the development workflow suite:
+
+Bash
 npm run dev
-```
-
-### Option B: Local MySQL install
-
-Use the MySQL service/installer on your machine and point `.env` to it.
-
-3) Run:
-
-```bash
-npm run dev
-```
-
-Tables are auto-created on startup.
-
-Quick verification:
-
-- Open `/api/health` and check `"persistence": "mysql"`.
-- Note: if port `8787` is already taken, the dev runner will auto-pick another port and print it in the console.
+The back-end initialization lifecycle maps, validates, and builds all necessary relational database schemas automatically on boot.

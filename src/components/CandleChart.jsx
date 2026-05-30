@@ -26,7 +26,7 @@ function formatTime(timestamp, showDate, showYear) {
   return `${hours}:${minutes}`;
 }
 
-// ── TECHNICAL INDICATORS MATH COMPUTATION CORE ──
+//TECHNICAL INDICATORS COMPUTATION
 function calculateSMA(candles, period) {
   const sma = new Array(candles.length).fill(null);
   if (candles.length < period) return sma;
@@ -143,8 +143,8 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
   const [isDragging, setIsDragging]                       = useState(false);
   const [requestedVisibleCount, setRequestedVisibleCount] = useState(120);
 
-  // ── NEW: CROSSHAIR INTERACTIVE INTERCEPTOR STATES ──
-  const [crosshair, setCrosshair] = useState(null); // { x, y, candleIndex, globalIndex }
+  //CROSSHAIR 
+  const [crosshair, setCrosshair] = useState(null);
 
   const paddingLeft  = 12;
   const paddingRight = 72;
@@ -318,12 +318,11 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
     return points.length >= 2 ? points.join(' ') : null;
   };
 
-  // ── NEW: HOVER EVENT HANDLING PIPELINE ──
+  //HOVER
   const handlePointerMove = (e) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     
-    // Scale standard mouse client positions back into our SVG viewBox metrics (0-1000)
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
     
@@ -338,7 +337,6 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
     const candleIdx = clamp(Math.floor((svgX - paddingLeft) / candleSlot), 0, visibleCandles.length - 1);
     const globalIdx = currentStartIndex + candleIdx;
     
-    // Snap crosshair X straight to center grid axes of the hovered candle column
     const snappedX = paddingLeft + candleIdx * candleSlot + candleSlot / 2;
 
     setCrosshair({ x: snappedX, y: svgY, candleIndex: candleIdx, globalIndex: globalIdx });
@@ -368,7 +366,7 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
         }}
         onPointerUp={(e) => { try { e.currentTarget.releasePointerCapture(e.pointerId); } catch(_) {} setIsDragging(false); }}
         onPointerCancel={(e) => { try { e.currentTarget.releasePointerCapture(e.pointerId); } catch(_) {} setIsDragging(false); }}
-        onPointerLeave={() => setCrosshair(null)} // Clear when pointer departures canvas
+        onPointerLeave={() => setCrosshair(null)}
       >
         {/* Main Panel grid boundaries */}
         {priceAxisLabels.map(({ price, y }, i) => (
@@ -424,7 +422,6 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
           </g>
         )}
 
-        {/* Overlays */}
         {indicatorsData.overlays.map((ind) => {
           if (ind.type === 'ma') {
             const p = renderLinePath(ind.data, scaleY);
@@ -470,10 +467,9 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
           </g>
         ))}
 
-        {/* ─── NEW: LIVE CROSSHAIR DATA HUD PANEL RENDERER LAYER ─── */}
+        {/*LIVE CROSSHAIR*/}
         {crosshair && visibleCandles[crosshair.candleIndex] && (
           <g key="crosshair-hud-layer" style={{ pointerEvents: 'none' }}>
-            {/* 1. Global full-height vertical tracking ray */}
             <line 
               x1={crosshair.x} x2={crosshair.x} 
               y1={paddingTop} y2={totalSvgHeight - paddingBottom} 
@@ -481,7 +477,6 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
               vectorEffect="non-scaling-stroke" 
             />
 
-            {/* 2. Horizontal guideline across active pricing chart */}
             {crosshair.y <= mainChartHeight && (
               <>
                 <line 
@@ -490,7 +485,6 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
                   stroke="rgba(255,255,255,0.25)" strokeWidth={1} strokeDasharray="3 3"
                   vectorEffect="non-scaling-stroke" 
                 />
-                {/* Dynamic Price HUD block anchor */}
                 <g transform={`translate(${width - paddingRight}, ${crosshair.y - 8})`}>
                   <rect width={68} height={16} rx={2} fill="#1e293b" stroke="var(--border)" strokeWidth={1} />
                   <text x={4} y={11} fontSize={9} fill="#f8fafc" fontFamily="monospace">
@@ -500,7 +494,6 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
               </>
             )}
 
-            {/* 3. RSI Oscillator dynamic data metrics tracking overlay */}
             {rsiConfig && indicatorsData.rsi && (
               (() => {
                 const rsiVal = indicatorsData.rsi[crosshair.globalIndex];
@@ -520,7 +513,6 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
               })()
             )}
 
-            {/* 4. MACD Oscillator system metric tracking node anchor */}
             {macdConfig && indicatorsData.macd && (
               (() => {
                 const mLineVal = indicatorsData.macd.macd[crosshair.globalIndex];
@@ -540,7 +532,6 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
               })()
             )}
 
-            {/* 5. Dynamic Time indicator tag pinned along base timeline */}
             {(() => {
               const candle = visibleCandles[crosshair.candleIndex];
               return candle?.t ? (
@@ -556,7 +547,6 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
         )}
       </svg>
 
-      {/* Scroll indicator bar container */}
       {safeCandles.length > visibleCount && (
         <div className="chart-scrollbar" style={{ bottom: '26px' }}>
           <div className="chart-scrollbar-thumb" style={{ left: `${(viewStart / safeCandles.length) * 100}%`, width: `${(visibleCount / safeCandles.length) * 100}%` }} />

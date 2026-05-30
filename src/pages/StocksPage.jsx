@@ -9,7 +9,6 @@ function StocksPage() {
   const loadStockAssets = useMarketStore((state) => state.loadStockAssets);
   const syncMarketPrices = usePortfolioStore((state) => state.syncMarketPrices);
 
-  // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('none'); // 'none' | 'name' | 'changeHigh' | 'changeLow'
 
@@ -43,7 +42,6 @@ function StocksPage() {
     };
   }, [loadStockAssets, syncMarketPrices]);
 
-  // Compute filtered/sorted stocks
   const filteredAssets = useMemo(() => {
     let result = [...assets];
 
@@ -82,7 +80,6 @@ function StocksPage() {
         <p className="asset-meta">Stocks tracked: {assets.length || '...'}</p>
       </div>
 
-      {/* Styled Responsive Toolbar */}
       <div className="market-toolbar">
         <div className="filter-row-container">
           <div className="search-wrapper" style={{ flex: 1 }}>

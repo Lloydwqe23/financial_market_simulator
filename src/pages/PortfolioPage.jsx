@@ -8,16 +8,13 @@ function PortfolioPage() {
   const transactions = usePortfolioStore((state) => state.transactions);
   const syncMarketPrices = usePortfolioStore((state) => state.syncMarketPrices);
 
-  // Grab market store actions to hydrate the portfolio page dynamically
   const loadCryptoAssets = useMarketStore((state) => state.loadCryptoAssets);
   const loadStockAssets = useMarketStore((state) => state.loadStockAssets);
   const loadCurrencyRates = useMarketStore((state) => state.loadCurrencyRates);
   const currencyBase = useMarketStore((state) => state.currencyBase);
 
-  // Filter selection: 'all' | 'crypto' | 'stock' | 'currency'
   const [activeCategory, setActiveCategory] = useState('all');
 
-  // ── NEW: DYNAMIC LIVE BACKGROUND FEED OVERWATCH KERNEL ──────────────────
   useEffect(() => {
     let mounted = true;
     let timerId = 0;
@@ -28,7 +25,6 @@ function PortfolioPage() {
       inFlight = true;
 
       try {
-        // Fetch all market assets concurrently to ensure immediate sync on mount
         await Promise.allSettled([
           loadCryptoAssets(),
           loadStockAssets(),
@@ -37,11 +33,9 @@ function PortfolioPage() {
 
         if (!mounted) return;
 
-        // Extract fresh current price states
         const currentCrypto = useMarketStore.getState().cryptoAssets;
         const currentStocks = useMarketStore.getState().stockAssets;
         
-        // Build Forex asset matrix manually to map currency IDs to tickers correctly
         const rates = useMarketStore.getState().currencyRates;
         const base = currencyBase || 'USD';
         const usdPerBase = base === 'USD' ? 1 : Number(rates?.usd || 1);
@@ -59,16 +53,13 @@ function PortfolioPage() {
           };
         }).filter((a) => a.price > 0);
 
-        // Pipe everything into your store core to calculate real-time PnL and check triggers
         const aggregateMarketTickers = [...currentCrypto, ...currentStocks, ...fxAssets];
         syncMarketPrices(aggregateMarketTickers);
 
       } catch (err) {
-        // Prevent silent thread blocking crashes
       } finally {
         inFlight = false;
         if (mounted) {
-          // Poll every single second for smooth ticker transformations
           timerId = window.setTimeout(refreshMarketFeeds, 1000);
         }
       }
@@ -83,7 +74,6 @@ function PortfolioPage() {
   }, [currencyBase, loadCryptoAssets, loadCurrencyRates, loadStockAssets, syncMarketPrices]);
   // ───────────────────────────────────────────────────────────────────────────
 
-  // Dynamically calculate portfolio worth accounting for spot valuation + unrealized futures PnL
   const portfolioValue = useMemo(() => {
     return holdings.reduce((sum, item) => {
       if (item.instrumentType !== 'futures') {
@@ -101,7 +91,6 @@ function PortfolioPage() {
 
   const totalWorth = balance + portfolioValue;
 
-  // Group holdings by Category -> Instrument Type on the fly
   const groupedHoldings = useMemo(() => {
     const categories = {
       crypto: { stock: [], futures: [] },
@@ -120,7 +109,6 @@ function PortfolioPage() {
     return categories;
   }, [holdings]);
 
-  // Helper render method for handling sub-tables neatly
   const renderSubSection = (title, items) => {
     if (!items || items.length === 0) return null;
 
@@ -218,7 +206,6 @@ function PortfolioPage() {
           </div>
         </div>
 
-        {/* Category Navigation Controls */}
         <div className="tf-row" style={{ marginBottom: '24px' }}>
           <button
             className={`tf-pill ${activeCategory === 'all' ? 'tf-pill--active' : ''}`}
@@ -251,7 +238,6 @@ function PortfolioPage() {
           <div className="empty-state">No investments held yet.</div>
         ) : (
           <div>
-            {/* Crypto Category Layer */}
             {(activeCategory === 'all' || activeCategory === 'crypto') && 
              (groupedHoldings.crypto.stock.length > 0 || groupedHoldings.crypto.futures.length > 0) && (
               <div style={{ marginBottom: '24px' }}>
@@ -261,7 +247,6 @@ function PortfolioPage() {
               </div>
             )}
 
-            {/* Stocks Category Layer */}
             {(activeCategory === 'all' || activeCategory === 'stock') && 
              (groupedHoldings.stock.stock.length > 0 || groupedHoldings.stock.futures.length > 0) && (
               <div style={{ marginBottom: '24px' }}>
@@ -271,7 +256,6 @@ function PortfolioPage() {
               </div>
             )}
 
-            {/* Currencies Category Layer */}
             {(activeCategory === 'all' || activeCategory === 'currency') && 
              (groupedHoldings.currency.stock.length > 0 || groupedHoldings.currency.futures.length > 0) && (
               <div style={{ marginBottom: '24px' }}>

@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 
-// ── helpers ──────────────────────────────────────────────────────────────────
 async function persistToServer(get) {
   try {
     await fetch('/api/portfolio', {
@@ -14,7 +13,7 @@ async function persistToServer(get) {
         lastMessage:  get().lastMessage,
       }),
     });
-  } catch (_) { /* ignore network errors */ }
+  } catch (_) {}
 }
 
 const usePortfolioStore = create((set, get) => ({
@@ -23,7 +22,7 @@ const usePortfolioStore = create((set, get) => ({
   transactions: [],
   lastMessage: 'Start by buying your first asset on the dashboard.',
 
-  // ── DEPOSIT ───────────────────────────────────────────────────────────────
+  //DEPOSIT
   deposit: (amount) => {
     const n = Number(amount);
     if (!Number.isFinite(n) || n <= 0) return { ok: false };
@@ -51,7 +50,7 @@ const usePortfolioStore = create((set, get) => ({
     return { ok: true };
   },
 
-  // ── BUY / OPEN POSITION ───────────────────────────────────────────────────
+  //BUY / OPEN POSITION
   buyAsset: ({ asset, amount, instrumentType = 'stock', futuresOptions = null }) => {
     const quantity = Number(amount);
     if (!asset || !Number.isFinite(quantity) || quantity <= 0) {
@@ -79,7 +78,6 @@ const usePortfolioStore = create((set, get) => ({
       const holdings = [...state.holdings];
 
       if (instrumentType !== 'futures') {
-        // ── Spot branch ──
         const idx = holdings.findIndex(
           (item) => item.id === asset.id && item.instrumentType !== 'futures',
         );
@@ -125,7 +123,6 @@ const usePortfolioStore = create((set, get) => ({
         };
 
       } else {
-        // ── Futures branch ──
         holdings.push({
           id:               `${asset.id}-futures-${crypto.randomUUID().slice(0, 4)}`,
           assetId:          asset.id,
@@ -166,12 +163,11 @@ const usePortfolioStore = create((set, get) => ({
       }
     });
 
-    // ✅ THIS was the missing line — persist after every buy
     setTimeout(() => persistToServer(get), 0);
     return { ok: true };
   },
 
-  // ── SELL / CLOSE SPOT POSITION ────────────────────────────────────────────
+  //SELL / CLOSE SPOT POSITION
   sellAsset: ({ asset, amount, instrumentType = 'stock' }) => {
     const quantity = Number(amount);
     if (!asset || !Number.isFinite(quantity) || quantity <= 0) {
@@ -229,7 +225,7 @@ const usePortfolioStore = create((set, get) => ({
     return { ok: true };
   },
 
-  // ── LIVE PRICE SYNC + AUTO LIQUIDATION / SL / TP ─────────────────────────
+  //LIVE PRICE SYNC + AUTO LIQUIDATION
   syncMarketPrices: (marketAssets) =>
     set((state) => {
       let updatedBalance = state.balance;
@@ -237,7 +233,6 @@ const usePortfolioStore = create((set, get) => ({
       let logs           = [];
 
       const nextHoldings = state.holdings.map((holding) => {
-        // FIX: Fallback to extracting the base ID from the composite identifier string if assetId is omitted
         const baseAssetId = holding.assetId || holding.id.split('-')[0];
         const found = marketAssets.find((a) => a.id === baseAssetId);
         
@@ -248,13 +243,11 @@ const usePortfolioStore = create((set, get) => ({
           return { ...holding, currentPrice: nextPrice };
         }
 
-        // Futures PnL
         const priceDiff    = holding.direction === 'long'
           ? nextPrice - holding.averagePrice
           : holding.averagePrice - nextPrice;
         const unrealizedPnL = priceDiff * holding.quantity;
 
-        // Risk triggers
         let triggered = false;
         let reason    = '';
         if (holding.direction === 'long'  && nextPrice <= holding.liquidationPrice) { triggered = true; reason = 'Liquidation'; }
@@ -317,12 +310,10 @@ const usePortfolioStore = create((set, get) => ({
       };
     });
 
-    // Fire off async data persistence payload instantly
     setTimeout(() => persistToServer(get), 0);
     return { ok: true };
   },
   
-  // ── FETCH FROM SERVER ─────────────────────────────────────────────────────
   fetchFromServer: async () => {
     try {
       const res = await fetch('/api/portfolio', { credentials: 'include' });

@@ -91,14 +91,12 @@ function ProfilePage() {
         </div>
       </div>
 
-      {/* ── Deposit panel ───────────────────────────────────────────────── */}
       <div className="surface">
         <h3 style={{ marginBottom: 6 }}>Add funds</h3>
         <p className="asset-meta" style={{ marginBottom: 16 }}>
           Simulate a deposit to your trading account.
         </p>
 
-        {/* Preset buttons */}
         <div className="deposit-presets">
           {PRESET_AMOUNTS.map((amt) => (
             <button
@@ -112,7 +110,6 @@ function ProfilePage() {
           ))}
         </div>
 
-        {/* Custom amount */}
         <div className="deposit-custom">
           <div className="deposit-input-wrap">
             <span className="deposit-currency-sign">$</span>
