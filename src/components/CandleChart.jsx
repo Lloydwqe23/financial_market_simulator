@@ -7,9 +7,9 @@ function clamp(value, min, max) {
 function formatPrice(value) {
   if (!Number.isFinite(value) || value <= 0) return '';
   if (value >= 10000) return value.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  if (value >= 100)   return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
-  if (value >= 1)     return value.toLocaleString('en-US', { maximumFractionDigits: 4 });
-  if (value >= 0.01)  return value.toFixed(4);
+  if (value >= 100) return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  if (value >= 1) return value.toLocaleString('en-US', { maximumFractionDigits: 4 });
+  if (value >= 0.01) return value.toFixed(4);
   return value.toFixed(6);
 }
 
@@ -20,7 +20,7 @@ function formatTime(timestamp, showDate, showYear) {
   const minutes = String(date.getMinutes()).padStart(2, '0');
   const month = date.getMonth() + 1;
   const day = date.getDate();
-  
+
   if (showYear) return `${month}/${date.getFullYear()}`;
   if (showDate) return `${month}/${day} ${hours}:${minutes}`;
   return `${hours}:${minutes}`;
@@ -135,29 +135,29 @@ function calculateMACD(candles, fast = 12, slow = 26, signal = 9) {
 }
 
 function CandleChart({ candles, height = 340, activeIndicators = [] }) {
-  const containerRef    = useRef(null);
-  const dragStateRef    = useRef({ startX: 0, startViewStart: 0 });
+  const containerRef = useRef(null);
+  const dragStateRef = useRef({ startX: 0, startViewStart: 0 });
   const prevMaxStartRef = useRef(0);
 
-  const [viewStart, setViewStart]                         = useState(0);
-  const [isDragging, setIsDragging]                       = useState(false);
+  const [viewStart, setViewStart] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const [requestedVisibleCount, setRequestedVisibleCount] = useState(120);
 
   //CROSSHAIR 
   const [crosshair, setCrosshair] = useState(null);
 
-  const paddingLeft  = 12;
+  const paddingLeft = 12;
   const paddingRight = 72;
-  const paddingTop   = 18;
-  const paddingBottom = 24; 
+  const paddingTop = 18;
+  const paddingBottom = 24;
 
   const minVisibleCandles = 10;
   const maxVisibleCandles = 500;
 
-  const safeCandles         = Array.isArray(candles) ? candles : [];
-  const canRender           = safeCandles.length >= 2;
+  const safeCandles = Array.isArray(candles) ? candles : [];
+  const canRender = safeCandles.length >= 2;
   const availableMaxVisible = Math.min(maxVisibleCandles, safeCandles.length);
-  const visibleCount        = clamp(requestedVisibleCount, minVisibleCandles, Math.max(minVisibleCandles, availableMaxVisible));
+  const visibleCount = clamp(requestedVisibleCount, minVisibleCandles, Math.max(minVisibleCandles, availableMaxVisible));
   const maxStart = Math.max(0, safeCandles.length - visibleCount);
 
   const rsiConfig = useMemo(() => activeIndicators.find(i => i.type === 'rsi'), [activeIndicators]);
@@ -172,7 +172,7 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
 
   const indicatorsData = useMemo(() => {
     if (!canRender) return { overlays: [], rsi: null, macd: null };
-    
+
     const overlays = activeIndicators.map((ind) => {
       if (ind.type === 'ma') return { id: ind.id, type: 'ma', color: ind.color || '#eab308', data: calculateSMA(safeCandles, ind.period || 20) };
       if (ind.type === 'bb') return { id: ind.id, type: 'bb', color: ind.color || '#ec4899', data: calculateBollingerBands(safeCandles, ind.period || 20, ind.stdDev || 2) };
@@ -322,10 +322,10 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
   const handlePointerMove = (e) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    
+
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
-    
+
     const svgX = (rawX / rect.width) * width;
     const svgY = (rawY / rect.height) * totalSvgHeight;
 
@@ -336,7 +336,7 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
 
     const candleIdx = clamp(Math.floor((svgX - paddingLeft) / candleSlot), 0, visibleCandles.length - 1);
     const globalIdx = currentStartIndex + candleIdx;
-    
+
     const snappedX = paddingLeft + candleIdx * candleSlot + candleSlot / 2;
 
     setCrosshair({ x: snappedX, y: svgY, candleIndex: candleIdx, globalIndex: globalIdx });
@@ -344,18 +344,21 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
 
   return (
     <div ref={containerRef} className="chart-shell">
-      <svg 
-        className="candle-chart" 
-        viewBox={`0 0 ${width} ${totalSvgHeight}`} 
+      <svg
+        className="candle-chart"
+        viewBox={`0 0 ${width} ${totalSvgHeight}`}
         preserveAspectRatio="none"
-        style={{ cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none', display: 'block', width: '100%' }}
-        onPointerDown={(e) => {
-          if (e.button !== 0 || !containerRef.current) return;
-          dragStateRef.current = { startX: e.clientX, startViewStart: viewStart };
-          e.currentTarget.setPointerCapture(e.pointerId);
-          setIsDragging(true);
+
+        height={totalSvgHeight}
+        style={{
+          cursor: isDragging ? 'grabbing' : 'grab',
+          userSelect: 'none',
+          display: 'block',
+          width: '100%',
+          minHeight: `${totalSvgHeight}px`
         }}
-        onPointerMove={(e) => {
+
+        onPointerDown={(e) => {
           if (isDragging) {
             const shift = Math.round((e.clientX - dragStateRef.current.startX) / Math.max(1, containerRef.current.clientWidth / visibleCount));
             setViewStart(clamp(dragStateRef.current.startViewStart - shift, 0, maxStart));
@@ -364,8 +367,8 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
             handlePointerMove(e);
           }
         }}
-        onPointerUp={(e) => { try { e.currentTarget.releasePointerCapture(e.pointerId); } catch(_) {} setIsDragging(false); }}
-        onPointerCancel={(e) => { try { e.currentTarget.releasePointerCapture(e.pointerId); } catch(_) {} setIsDragging(false); }}
+        onPointerUp={(e) => { try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { } setIsDragging(false); }}
+        onPointerCancel={(e) => { try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { } setIsDragging(false); }}
         onPointerLeave={() => setCrosshair(null)}
       >
         {/* Main Panel grid boundaries */}
@@ -385,7 +388,7 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
             <text x={width - paddingRight + 6} y={scaleRsiY(70) + 3} fontSize={9} fill="rgba(239, 68, 68, 0.5)" fontFamily="monospace">70</text>
             <text x={width - paddingRight + 6} y={scaleRsiY(30) + 3} fontSize={9} fill="rgba(16, 185, 129, 0.5)" fontFamily="monospace">30</text>
             <text x={paddingLeft + 6} y={rsiYTop + 14} fontSize={10} fontWeight="bold" fill="#a855f7">RSI ({rsiConfig.period || 14})</text>
-            
+
             {(() => {
               const path = renderLinePath(indicatorsData.rsi, scaleRsiY);
               return path ? <polyline fill="none" stroke="#a855f7" strokeWidth={1.5} points={path} vectorEffect="non-scaling-stroke" /> : null;
@@ -398,7 +401,7 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
             <line x1={paddingLeft} x2={width - paddingRight} y1={macdYTop} y2={macdYTop} stroke="var(--border)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
             <line x1={paddingLeft} x2={width - paddingRight} y1={scaleMacdY(0)} y2={scaleMacdY(0)} stroke="rgba(148,163,184,0.15)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
             <text x={paddingLeft + 6} y={macdYTop + 14} fontSize={10} fontWeight="bold" fill="#06b6d4">MACD ({macdConfig.fast},{macdConfig.slow},{macdConfig.signal})</text>
-            
+
             {visibleCandles.map((_, i) => {
               const idx = currentStartIndex + i;
               const hVal = indicatorsData.macd.hist[idx];
@@ -470,20 +473,20 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
         {/*LIVE CROSSHAIR*/}
         {crosshair && visibleCandles[crosshair.candleIndex] && (
           <g key="crosshair-hud-layer" style={{ pointerEvents: 'none' }}>
-            <line 
-              x1={crosshair.x} x2={crosshair.x} 
-              y1={paddingTop} y2={totalSvgHeight - paddingBottom} 
+            <line
+              x1={crosshair.x} x2={crosshair.x}
+              y1={paddingTop} y2={totalSvgHeight - paddingBottom}
               stroke="rgba(255,255,255,0.25)" strokeWidth={1} strokeDasharray="3 3"
-              vectorEffect="non-scaling-stroke" 
+              vectorEffect="non-scaling-stroke"
             />
 
             {crosshair.y <= mainChartHeight && (
               <>
-                <line 
-                  x1={paddingLeft} x2={width - paddingRight} 
-                  y1={crosshair.y} y2={crosshair.y} 
+                <line
+                  x1={paddingLeft} x2={width - paddingRight}
+                  y1={crosshair.y} y2={crosshair.y}
                   stroke="rgba(255,255,255,0.25)" strokeWidth={1} strokeDasharray="3 3"
-                  vectorEffect="non-scaling-stroke" 
+                  vectorEffect="non-scaling-stroke"
                 />
                 <g transform={`translate(${width - paddingRight}, ${crosshair.y - 8})`}>
                   <rect width={68} height={16} rx={2} fill="#1e293b" stroke="var(--border)" strokeWidth={1} />
@@ -548,7 +551,7 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
       </svg>
 
       {safeCandles.length > visibleCount && (
-        <div className="chart-scrollbar" style={{ bottom: '26px' }}>
+        <div className="chart-scrollbar" style={{ bottom: '4px' }}>
           <div className="chart-scrollbar-thumb" style={{ left: `${(viewStart / safeCandles.length) * 100}%`, width: `${(visibleCount / safeCandles.length) * 100}%` }} />
         </div>
       )}

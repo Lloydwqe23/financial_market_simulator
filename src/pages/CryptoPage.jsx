@@ -70,11 +70,25 @@ function CryptoPage() {
   return (
     <section className="surface">
       <div className="hero">
-        <h2>Crypto</h2>
-        <p>Live crypto quotes updated every second.</p>
-        <p className="asset-meta">Status: {status}</p>
-        <p className="asset-meta">Average change: {marketSummary}%</p>
-        <p className="asset-meta">Coins tracked: {assets.length || '...'}</p>
+        <div className="hero-title-row">
+          <h2>Crypto</h2>
+          <div className="info-tooltip-wrapper">
+            <svg className="info-icon" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span className="info-tooltip-text">Live crypto quotes updated every second.</span>
+          </div>
+        </div>
+
+        <div className="hero-meta-row">
+          <span className="asset-meta">Status: {status}</span>
+          <span className="asset-meta">•</span>
+          <span className="asset-meta">Average change: {marketSummary}%</span>
+          <span className="asset-meta">•</span>
+          <span className="asset-meta">Coins tracked: {assets.length || '...'}</span>
+        </div>
       </div>
 
       <div className="market-toolbar">

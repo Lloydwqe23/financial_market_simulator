@@ -134,23 +134,40 @@ function CurrencyPage() {
 
   return (
     <section className="surface">
+
+      {/* --- UPDATED HERO SECTION --- */}
       <div className="hero">
-        <h2><h2>Currency</h2></h2>
-        <p>Pick a base currency and trade FX pairs.</p>
-        <p className="asset-meta">Status: {status}</p>
-        <p className="asset-meta">
-          1 {selectedBase} ≈ {usdAnchor === null ? '...' : `${Number(usdAnchor).toFixed(4)} USD`}
-        </p>
-        <p className="asset-meta">Currencies tracked: {CURRENCIES.length}</p>
+        <div className="hero-title-row">
+          <h2>Currency</h2>
+          <div className="info-tooltip-wrapper">
+            <svg className="info-icon" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span className="info-tooltip-text">Pick a base currency and trade FX pairs.</span>
+          </div>
+        </div>
+
+        <div className="hero-meta-row">
+          <span className="asset-meta">Status: {status}</span>
+          <span className="asset-meta">•</span>
+          <span className="asset-meta">
+            1 {selectedBase} ≈ {usdAnchor === null ? '...' : `${Number(usdAnchor).toFixed(4)} USD`}
+          </span>
+          <span className="asset-meta">•</span>
+          <span className="asset-meta">Currencies tracked: {CURRENCIES.length}</span>
+        </div>
       </div>
+      {/* ---------------------------- */}
 
       <div className="market-toolbar">
         <div className="filter-row-container">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span className="asset-meta">Base currency:</span>
-            <select 
+            <select
               className="market-select"
-              value={selectedBase} 
+              value={selectedBase}
               onChange={(event) => setSelectedBase(event.target.value)}
             >
               {CURRENCIES.map((code) => (
@@ -160,7 +177,7 @@ function CurrencyPage() {
               ))}
             </select>
           </div>
-          
+
           <div className="search-wrapper" style={{ maxWidth: '300px' }}>
             <input
               type="text"

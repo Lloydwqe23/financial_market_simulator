@@ -134,20 +134,37 @@ function resamplePricesToCandles(prices, intervalMs) {
   if (points.length < 2) return [];
 
   const candles = [];
-  let current   = null;
+  let current = null;
 
   for (const point of points) {
     const bucket = Math.floor(point.t / ms) * ms;
+
     if (!current || current.t !== bucket) {
-      if (current) candles.push(current);
+      if (current) {
+        candles.push(current);
+
+        let nextBucket = current.t + ms;
+        while (nextBucket < bucket) {
+          candles.push({
+            t: nextBucket,
+            open: current.close,
+            high: current.close,
+            low: current.close,
+            close: current.close
+          });
+          nextBucket += ms;
+        }
+      }
       current = { t: bucket, open: point.price, high: point.price, low: point.price, close: point.price };
       continue;
     }
-    current.high  = Math.max(current.high,  point.price);
-    current.low   = Math.min(current.low,   point.price);
+
+    current.high = Math.max(current.high, point.price);
+    current.low = Math.min(current.low, point.price);
     current.close = point.price;
   }
   if (current) candles.push(current);
+
   return candles;
 }
 
@@ -443,17 +460,22 @@ function AssetDetailPage() {
   return (
     <section className="section-list">
       <div className="surface">
-        <div className="asset-toolbar">
-          <button type="button" className="ghost-button" onClick={() => navigate(-1)}>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          <button type="button" className="ghost-button" onClick={() => navigate(-1)} style={{ margin: 0 }}>
             ← Back
           </button>
-        </div>
-        <div className="hero" style={{ marginBottom: 16 }}>
-          <h2 style={{ marginBottom: 4 }}>{displayAsset.type === 'currency' && quoteCurrency ? `${displayAsset.name} / ${quoteCurrency.toUpperCase()}` : displayAsset.name}</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span className="price">{displayAsset.type === 'currency' && quoteCurrency ? `${Number(displayAsset.price).toFixed(4)} ${quoteCurrency.toUpperCase()}` : `$${Number(displayAsset.price).toFixed(2)}`}</span>
+
+          <h2 style={{ margin: 0, lineHeight: 1 }}>
+            {displayAsset.type === 'currency' && quoteCurrency ? `${displayAsset.name} / ${quoteCurrency.toUpperCase()}` : displayAsset.name}
+          </h2>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span className="price" style={{ lineHeight: 1 }}>
+              {displayAsset.type === 'currency' && quoteCurrency ? `${Number(displayAsset.price).toFixed(4)} ${quoteCurrency.toUpperCase()}` : `$${Number(displayAsset.price).toFixed(2)}`}
+            </span>
             {Number.isFinite(displayAsset.change24h) && (
-              <span className={`asset-meta ${displayAsset.change24h >= 0 ? 'positive' : 'negative'}`}>
+              <span className={`asset-meta ${displayAsset.change24h >= 0 ? 'positive' : 'negative'}`} style={{ margin: 0 }}>
                 {displayAsset.change24h >= 0 ? '+' : ''}{Number(displayAsset.change24h).toFixed(2)}%
               </span>
             )}

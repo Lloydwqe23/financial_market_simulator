@@ -72,13 +72,30 @@ function StocksPage() {
 
   return (
     <section className="surface">
+
+      {/* --- UPDATED HERO SECTION --- */}
       <div className="hero">
-        <h2>Stocks</h2>
-        <p>Public quotes for Apple, Microsoft, NVIDIA, and other companies.</p>
-        <p className="asset-meta">Status: {status}</p>
-        <p className="asset-meta">Average change: {marketSummary}%</p>
-        <p className="asset-meta">Stocks tracked: {assets.length || '...'}</p>
+        <div className="hero-title-row">
+          <h2>Stocks</h2>
+          <div className="info-tooltip-wrapper">
+            <svg className="info-icon" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span className="info-tooltip-text">Public quotes for Apple, Microsoft, NVIDIA, and other companies.</span>
+          </div>
+        </div>
+
+        <div className="hero-meta-row">
+          <span className="asset-meta">Status: {status}</span>
+          <span className="asset-meta">•</span>
+          <span className="asset-meta">Average change: {marketSummary}%</span>
+          <span className="asset-meta">•</span>
+          <span className="asset-meta">Stocks tracked: {assets.length || '...'}</span>
+        </div>
       </div>
+      {/* ---------------------------- */}
 
       <div className="market-toolbar">
         <div className="filter-row-container">
@@ -91,30 +108,30 @@ function StocksPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          
+
           <div className="tf-row" style={{ marginBottom: 0 }}>
-            <button 
+            <button
               type="button"
               className={`tf-pill ${sortBy === 'none' ? 'tf-pill--active' : ''}`}
               onClick={() => setSortBy('none')}
             >
               Default
             </button>
-            <button 
+            <button
               type="button"
               className={`tf-pill ${sortBy === 'name' ? 'tf-pill--active' : ''}`}
               onClick={() => setSortBy('name')}
             >
               Name (A-Z)
             </button>
-            <button 
+            <button
               type="button"
               className={`tf-pill ${sortBy === 'changeHigh' ? 'tf-pill--active' : ''}`}
               onClick={() => setSortBy('changeHigh')}
             >
               Top Gainers
             </button>
-            <button 
+            <button
               type="button"
               className={`tf-pill ${sortBy === 'changeLow' ? 'tf-pill--active' : ''}`}
               onClick={() => setSortBy('changeLow')}

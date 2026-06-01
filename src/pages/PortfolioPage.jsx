@@ -35,11 +35,11 @@ function PortfolioPage() {
 
         const currentCrypto = useMarketStore.getState().cryptoAssets;
         const currentStocks = useMarketStore.getState().stockAssets;
-        
+
         const rates = useMarketStore.getState().currencyRates;
         const base = currencyBase || 'USD';
         const usdPerBase = base === 'USD' ? 1 : Number(rates?.usd || 1);
-        
+
         const fxAssets = CURRENCIES.map((code) => {
           const codeLow = code.toLowerCase();
           const baseToCode = Number(rates?.[codeLow]);
@@ -120,7 +120,7 @@ function PortfolioPage() {
         <div className="section-list">
           {items.map((holding) => {
             const isFutures = holding.instrumentType === 'futures';
-            
+
             let displayPnL = 0;
             let totalDisplayValue = 0;
 
@@ -144,10 +144,10 @@ function PortfolioPage() {
                       {holding.name} ({holding.symbol.toUpperCase()})
                     </strong>
                     {isFutures && (
-                      <span 
-                        className="auth-pill" 
-                        style={{ 
-                          fontSize: '0.65rem', 
+                      <span
+                        className="auth-pill"
+                        style={{
+                          fontSize: '0.65rem',
                           padding: '2px 8px',
                           background: holding.direction === 'long' ? 'rgba(66, 211, 146, 0.16)' : 'rgba(255, 122, 122, 0.16)',
                           color: holding.direction === 'long' ? 'var(--accent)' : 'var(--danger)',
@@ -161,7 +161,7 @@ function PortfolioPage() {
                     )}
                   </div>
                   <small style={{ marginTop: '4px', display: 'block' }}>
-                    {isFutures 
+                    {isFutures
                       ? `Contracts: ${holding.quantity} | Entry: $${holding.averagePrice.toFixed(2)} | Collateral Margin: $${holding.margin.toFixed(2)}`
                       : `Quantity: ${holding.quantity} | Avg: $${holding.averagePrice.toFixed(2)}`
                     }
@@ -186,10 +186,22 @@ function PortfolioPage() {
   return (
     <section className="page-grid">
       <div className="surface">
+
+        {/* --- UPDATED HERO SECTION --- */}
         <div className="hero">
-          <h2>Portfolio</h2>
-          <p>Your global account state, segmented assets, and comprehensive trading distributions.</p>
+          <div className="hero-title-row">
+            <h2>Portfolio</h2>
+            <div className="info-tooltip-wrapper">
+              <svg className="info-icon" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              <span className="info-tooltip-text">Your global account state, segmented assets, and comprehensive trading distributions.</span>
+            </div>
+          </div>
         </div>
+        {/* ---------------------------- */}
 
         <div className="grid-cards" style={{ marginBottom: 24 }}>
           <div className="asset-card">
@@ -238,32 +250,32 @@ function PortfolioPage() {
           <div className="empty-state">No investments held yet.</div>
         ) : (
           <div>
-            {(activeCategory === 'all' || activeCategory === 'crypto') && 
-             (groupedHoldings.crypto.stock.length > 0 || groupedHoldings.crypto.futures.length > 0) && (
-              <div style={{ marginBottom: '24px' }}>
-                <h4>Cryptocurrency Ledger</h4>
-                {renderSubSection('Spot Asset Positions', groupedHoldings.crypto.stock)}
-                {renderSubSection('Derivative Futures Contracts', groupedHoldings.crypto.futures)}
-              </div>
-            )}
+            {(activeCategory === 'all' || activeCategory === 'crypto') &&
+              (groupedHoldings.crypto.stock.length > 0 || groupedHoldings.crypto.futures.length > 0) && (
+                <div style={{ marginBottom: '24px' }}>
+                  <h4>Cryptocurrency Ledger</h4>
+                  {renderSubSection('Spot Asset Positions', groupedHoldings.crypto.stock)}
+                  {renderSubSection('Derivative Futures Contracts', groupedHoldings.crypto.futures)}
+                </div>
+              )}
 
-            {(activeCategory === 'all' || activeCategory === 'stock') && 
-             (groupedHoldings.stock.stock.length > 0 || groupedHoldings.stock.futures.length > 0) && (
-              <div style={{ marginBottom: '24px' }}>
-                <h4>Equity Shares</h4>
-                {renderSubSection('Standard Equity Shares', groupedHoldings.stock.stock)}
-                {renderSubSection('Stock Index Futures', groupedHoldings.stock.futures)}
-              </div>
-            )}
+            {(activeCategory === 'all' || activeCategory === 'stock') &&
+              (groupedHoldings.stock.stock.length > 0 || groupedHoldings.stock.futures.length > 0) && (
+                <div style={{ marginBottom: '24px' }}>
+                  <h4>Equity Shares</h4>
+                  {renderSubSection('Standard Equity Shares', groupedHoldings.stock.stock)}
+                  {renderSubSection('Stock Index Futures', groupedHoldings.stock.futures)}
+                </div>
+              )}
 
-            {(activeCategory === 'all' || activeCategory === 'currency') && 
-             (groupedHoldings.currency.stock.length > 0 || groupedHoldings.currency.futures.length > 0) && (
-              <div style={{ marginBottom: '24px' }}>
-                <h4>Forex Matrix</h4>
-                {renderSubSection('Spot Currency Holdings', groupedHoldings.currency.stock)}
-                {renderSubSection('Currency Futures Options', groupedHoldings.currency.futures)}
-              </div>
-            )}
+            {(activeCategory === 'all' || activeCategory === 'currency') &&
+              (groupedHoldings.currency.stock.length > 0 || groupedHoldings.currency.futures.length > 0) && (
+                <div style={{ marginBottom: '24px' }}>
+                  <h4>Forex Matrix</h4>
+                  {renderSubSection('Spot Currency Holdings', groupedHoldings.currency.stock)}
+                  {renderSubSection('Currency Futures Options', groupedHoldings.currency.futures)}
+                </div>
+              )}
           </div>
         )}
 
@@ -283,7 +295,7 @@ function PortfolioPage() {
               let absoluteValue = Math.abs(transaction.total);
 
               if (transaction.type === 'buy' || transaction.type === 'deposit') {
-                isOutflow = transaction.type === 'buy'; 
+                isOutflow = transaction.type === 'buy';
               } else if (transaction.type === 'futures_close') {
                 isOutflow = transaction.total < 0;
               }
@@ -306,7 +318,7 @@ function PortfolioPage() {
                       {transaction.quantity} {transaction.symbol.toUpperCase()} • {transaction.time}
                     </small>
                   </div>
-                  
+
                   <strong className={displayClass}>
                     {displaySign}${absoluteValue.toFixed(2)}
                   </strong>

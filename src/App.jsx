@@ -58,10 +58,34 @@ function App() {
 
   return (
     <div className="app-shell">
+
       <header className="topbar">
         <div>
           <h1>Market Simulator</h1>
         </div>
+      </header>
+
+      <div className="nav-and-stats-row">
+        <nav className="nav">
+          <NavLink to="/crypto" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Crypto
+          </NavLink>
+          <NavLink to="/stocks" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Stocks
+          </NavLink>
+          <NavLink to="/currency" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Currency
+          </NavLink>
+          <NavLink to="/portfolio" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Portfolio
+          </NavLink>
+          {user && (
+            <NavLink to="/profile" className={({ isActive }) => (isActive ? 'active' : '')}>
+              Profile
+            </NavLink>
+          )}
+        </nav>
+
         <div className="topbar-stats">
           <div>
             <span>Balance</span>
@@ -95,28 +119,9 @@ function App() {
             </div>
           )}
         </div>
-      </header>
+      </div>
 
-      <nav className="nav">
-        <NavLink to="/crypto" className={({ isActive }) => (isActive ? 'active' : '')}>
-          Crypto
-        </NavLink>
-        <NavLink to="/stocks" className={({ isActive }) => (isActive ? 'active' : '')}>
-          Stocks
-        </NavLink>
-        <NavLink to="/currency" className={({ isActive }) => (isActive ? 'active' : '')}>
-          Currency
-        </NavLink>
-        <NavLink to="/portfolio" className={({ isActive }) => (isActive ? 'active' : '')}>
-          Portfolio
-        </NavLink>
-        {user && (
-          <NavLink to="/profile" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Profile
-          </NavLink>
-        )}
-      </nav>
-
+      {/* 4. The main content routing block */}
       <main className="main-content">
         <Routes>
           <Route path="/" element={<Navigate to="/crypto" replace />} />
@@ -131,6 +136,7 @@ function App() {
           <Route path="*" element={<Navigate to="/crypto" replace />} />
         </Routes>
       </main>
+
     </div>
   );
 }
