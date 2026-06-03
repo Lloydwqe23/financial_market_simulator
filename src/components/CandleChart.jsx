@@ -344,31 +344,52 @@ function CandleChart({ candles, height = 340, activeIndicators = [] }) {
 
   return (
     <div ref={containerRef} className="chart-shell">
-      <svg
-        className="candle-chart"
-        viewBox={`0 0 ${width} ${totalSvgHeight}`}
+      <svg 
+        className="candle-chart" 
+        viewBox={`0 0 ${width} ${totalSvgHeight}`} 
         preserveAspectRatio="none"
-
-        height={totalSvgHeight}
-        style={{
-          cursor: isDragging ? 'grabbing' : 'grab',
-          userSelect: 'none',
-          display: 'block',
-          width: '100%',
-          minHeight: `${totalSvgHeight}px`
-        }}
-
+        style={{ cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none', display: 'block', width: '100%', touchAction: 'none' }}
+        
         onPointerDown={(e) => {
+          // Only trigger drag tracking if clicking the primary left mouse button
+          if (e.button !== 0) return; 
+          
+          dragStateRef.current = { 
+            startX: e.clientX, 
+            startViewStart: viewStart 
+          };
+          
+          // Explicitly target the container element wrapper to lock browser panning controls
+          e.currentTarget.setPointerCapture(e.pointerId);
+          setIsDragging(true);
+        }}
+        
+        onPointerMove={(e) => {
           if (isDragging) {
-            const shift = Math.round((e.clientX - dragStateRef.current.startX) / Math.max(1, containerRef.current.clientWidth / visibleCount));
+            // Calculate layout shift velocity cleanly without triggering crosshair redraw loops
+            const pxPerCandle = Math.max(1, containerRef.current.clientWidth / visibleCount);
+            const shift = Math.round((e.clientX - dragStateRef.current.startX) / pxPerCandle);
+            
             setViewStart(clamp(dragStateRef.current.startViewStart - shift, 0, maxStart));
-            setCrosshair(null);
           } else {
-            handlePointerMove(e);
+            // Only track crosshair metrics when the mouse is moving freely without clicking
+            handlePointerMove(e); 
           }
         }}
-        onPointerUp={(e) => { try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { } setIsDragging(false); }}
-        onPointerCancel={(e) => { try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { } setIsDragging(false); }}
+        
+        onPointerUp={(e) => {
+          if (isDragging) {
+            try { e.currentTarget.releasePointerCapture(e.pointerId); } catch(_) {}
+            setIsDragging(false);
+          }
+        }}
+        
+        onPointerCancel={(e) => {
+          if (isDragging) {
+            try { e.currentTarget.releasePointerCapture(e.pointerId); } catch(_) {}
+            setIsDragging(false);
+          }
+        }}
         onPointerLeave={() => setCrosshair(null)}
       >
         {/* Main Panel grid boundaries */}
