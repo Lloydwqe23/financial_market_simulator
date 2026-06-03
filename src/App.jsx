@@ -8,6 +8,9 @@ import PortfolioPage from './pages/PortfolioPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
+import HistoryPage from './pages/HistoryPage';
+import CreditsPage from './pages/CreditsPage';
+import ReviewsPage from './pages/ReviewsPage';
 import { usePortfolioStore } from './store/portfolioStore';
 import { useAuthStore } from './store/authStore';
 
@@ -79,14 +82,19 @@ function App() {
           <NavLink to="/portfolio" className={({ isActive }) => (isActive ? 'active' : '')}>
             Portfolio
           </NavLink>
-          {user && (
+
+          {user ? (
             <NavLink to="/profile" className={({ isActive }) => (isActive ? 'active' : '')}>
               Profile
+            </NavLink>
+          ) : (
+            <NavLink to="/reviews" className={({ isActive }) => (isActive ? 'active' : '')}>
+              Reviews
             </NavLink>
           )}
         </nav>
 
-        <div className="topbar-stats">
+        <div className="topbar-stats" style={{ display: 'flex', alignItems: 'stretch', gap: '16px' }}>
           <div>
             <span>Balance</span>
             <strong>${balance.toFixed(2)}</strong>
@@ -95,33 +103,30 @@ function App() {
             <span>Holdings</span>
             <strong>{holdingsCount}</strong>
           </div>
-          {user ? (
-            <div className="topbar-stats-user-card">
-              <NavLink to="/profile" className="user-link">
-                <div className="user-avatar">{userInitial}</div>
-                <div className="user-text">
-                  <div className="user-label">Signed in</div>
-                  <div className="user-name">{user.email}</div>
-                </div>
-              </NavLink>
-              <button type="button" className="ghost-button" onClick={logout}>
+
+          <div className="topbar-stats-user-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '120px', padding: '0 16px', margin: 0 }}>
+            {user ? (
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={logout}
+                style={{ margin: 0, padding: '10px 24px', fontSize: '1rem', fontWeight: 'bold' }}
+              >
                 Sign out
               </button>
-            </div>
-          ) : (
-            <div className="topbar-stats-user-card" style={{ justifyContent: 'center' }}>
-              <NavLink to="/login" className="auth-link">
-                <svg className="auth-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path fill="currentColor" d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5Zm0 2c-4.42 0-8 2.01-8 4.5V21h16v-2.5c0-2.49-3.58-4.5-8-4.5Z" />
-                </svg>
-                <div className="auth-link-text">Sign in</div>
+            ) : (
+              <NavLink
+                to="/login"
+                className="primary-button"
+                style={{ margin: 0, padding: '10px 24px', fontSize: '1rem', fontWeight: 'bold', textDecoration: 'none' }}
+              >
+                Sign in
               </NavLink>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 4. The main content routing block */}
       <main className="main-content">
         <Routes>
           <Route path="/" element={<Navigate to="/crypto" replace />} />
@@ -130,9 +135,12 @@ function App() {
           <Route path="/currency" element={<CurrencyPage />} />
           <Route path="/asset/:type/:id" element={<AssetDetailPage />} />
           <Route path="/portfolio" element={<PortfolioPage />} />
+          <Route path="/history" element={<HistoryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/credits" element={<CreditsPage />} />
+          <Route path="/reviews" element={<ReviewsPage />} />
           <Route path="*" element={<Navigate to="/crypto" replace />} />
         </Routes>
       </main>

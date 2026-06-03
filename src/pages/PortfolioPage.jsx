@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePortfolioStore } from '../store/portfolioStore';
 import { CURRENCIES, useMarketStore } from '../store/marketStore';
+import { useNavigate } from 'react-router-dom';
 
 function PortfolioPage() {
   const balance = usePortfolioStore((state) => state.balance);
@@ -9,6 +10,7 @@ function PortfolioPage() {
   const pendingOrders = usePortfolioStore((state) => state.pendingOrders);
   const cancelOrder = usePortfolioStore((state) => state.cancelOrder);
   const syncMarketPrices = usePortfolioStore((state) => state.syncMarketPrices);
+  const navigate = useNavigate();
 
   const loadCryptoAssets = useMarketStore((state) => state.loadCryptoAssets);
   const loadStockAssets = useMarketStore((state) => state.loadStockAssets);
@@ -74,7 +76,6 @@ function PortfolioPage() {
       window.clearTimeout(timerId);
     };
   }, [currencyBase, loadCryptoAssets, loadCurrencyRates, loadStockAssets, syncMarketPrices]);
-  // ───────────────────────────────────────────────────────────────────────────
 
   const portfolioValue = useMemo(() => {
     return holdings.reduce((sum, item) => {
@@ -334,42 +335,33 @@ function PortfolioPage() {
         </div>
       </div>
 
-      <div className="surface" style={{ marginTop: '24px' }}>
-        {pendingOrders.length > 0 && (
-          <div style={{ marginBottom: '32px' }}>
-            <h4 style={{ marginBottom: '16px', color: 'var(--accent)' }}>Pending Limit Orders</h4>
-            <div className="section-list">
-              {pendingOrders.map(order => (
-                <div className="list-item" key={order.id} style={{ borderLeft: '3px solid var(--accent)', paddingLeft: '12px' }}>
-                  <div>
-                    <strong>{order.direction.toUpperCase()} {order.name} ({order.instrumentType})</strong>
-                    <small style={{ display: 'block', marginTop: '4px' }}>
-                      Qty: {order.quantity} {order.symbol.toUpperCase()} | Target: ${order.limitPrice.toFixed(2)}
-                    </small>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <button type="button" className="tf-pill" style={{ color: 'var(--danger)', borderColor: 'var(--danger)', padding: '4px 10px', fontSize: '0.7rem' }} onClick={() => cancelOrder(order.id)}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      <div className="surface">
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ margin: 0 }}>Transaction history</h3>
-          <button type="button" className="tf-pill" onClick={exportTransactionsToCSV} disabled={transactions.length === 0} style={{ padding: '6px 12px', fontSize: '0.75rem', borderColor: 'var(--border)' }}>
-            Export CSV Data
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Recent Activity</h3>
+            <p className="asset-meta" style={{ margin: '4px 0 0 0', fontSize: '0.85rem' }}>
+              {transactions.length} total ledger records
+            </p>
+          </div>
+
+          {transactions.length > 5 && (
+            <button
+              type="button"
+              className="primary-button"
+              style={{ padding: '6px 12px', margin: 0, width: 'auto', fontSize: '0.75rem' }}
+              onClick={() => navigate('/history')}
+            >
+              View Full Ledger →
+            </button>
+          )}
         </div>
 
         {transactions.length === 0 ? (
           <div className="empty-state">Transactions will appear after your first buy or sell.</div>
         ) : (
           <div className="section-list">
-            {transactions.map((transaction) => {
+            {transactions.slice(0, 5).map((transaction) => {
               let isOutflow = false;
               let isNeutral = false;
               let absoluteValue = Math.abs(transaction.total);
@@ -384,7 +376,6 @@ function PortfolioPage() {
 
               const displaySign = isNeutral ? '' : isOutflow ? '-' : '+';
               const displayClass = isNeutral ? 'asset-meta' : isOutflow ? 'negative' : 'positive';
-
               const titlePrefix = transaction.type === 'buy' || transaction.type === 'sell' ? transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1) : '';
 
               return (

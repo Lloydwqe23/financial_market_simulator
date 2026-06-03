@@ -6,15 +6,15 @@ import { usePortfolioStore } from '../store/portfolioStore';
 const PRESET_AMOUNTS = [500, 1000, 5000, 10000];
 
 function ProfilePage() {
-  const user         = useAuthStore((s) => s.user);
-  const logout       = useAuthStore((s) => s.logout);
-  const balance      = usePortfolioStore((s) => s.balance);
-  const holdings     = usePortfolioStore((s) => s.holdings);
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+  const balance = usePortfolioStore((s) => s.balance);
+  const holdings = usePortfolioStore((s) => s.holdings);
   const transactions = usePortfolioStore((s) => s.transactions);
-  const deposit      = usePortfolioStore((s) => s.deposit);
+  const deposit = usePortfolioStore((s) => s.deposit);
 
   const [depositInput, setDepositInput] = useState('');
-  const [depositMsg,   setDepositMsg]   = useState(null); // { ok, text }
+  const [depositMsg, setDepositMsg] = useState(null);
 
   const portfolioValue = useMemo(
     () => holdings.reduce((sum, h) => sum + h.quantity * h.currentPrice, 0),
@@ -57,6 +57,7 @@ function ProfilePage() {
 
   return (
     <section className="page-grid">
+
       <div className="surface profile-card">
         <div className="profile-header">
           <div className="profile-avatar">{initial}</div>
@@ -87,6 +88,8 @@ function ProfilePage() {
 
         <div className="profile-actions">
           <Link to="/portfolio" className="secondary-button">View portfolio</Link>
+          <Link to="/reviews" className="secondary-button">Platform Reviews</Link>
+          <Link to="/credits" className="secondary-button">Project Credits</Link>
           <button type="button" className="ghost-button" onClick={logout}>Sign out</button>
         </div>
       </div>
@@ -140,6 +143,7 @@ function ProfilePage() {
           </p>
         )}
       </div>
+
     </section>
   );
 }
