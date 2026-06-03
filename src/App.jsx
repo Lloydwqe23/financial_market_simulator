@@ -11,6 +11,7 @@ import ProfilePage from './pages/ProfilePage';
 import HistoryPage from './pages/HistoryPage';
 import CreditsPage from './pages/CreditsPage';
 import ReviewsPage from './pages/ReviewsPage';
+import StatsPage from './pages/StatsPage';
 import { usePortfolioStore } from './store/portfolioStore';
 import { useAuthStore } from './store/authStore';
 
@@ -141,6 +142,7 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/credits" element={<CreditsPage />} />
           <Route path="/reviews" element={<ReviewsPage />} />
+          <Route path="/stats" element={<StatsPage />} />
           <Route path="*" element={<Navigate to="/crypto" replace />} />
         </Routes>
       </main>

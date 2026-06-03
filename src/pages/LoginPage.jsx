@@ -12,7 +12,7 @@ export default function LoginPage() {
   const submit = async (e) => {
     e.preventDefault();
     const ok = await login(email, password);
-    if (ok) navigate('/portfolio');
+    if (ok) navigate('/profile');
   };
 
   return (

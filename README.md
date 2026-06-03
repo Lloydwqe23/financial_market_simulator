@@ -1,81 +1,63 @@
-Market Simulator
-A React-based financial market and cryptocurrency trading simulation platform. This application provides a sandbox environment for tracking asset data, managing portfolios, and simulating spot and futures execution.
+# Financial Market Simulator
 
-Features
-Asset Tracking and Data Integration
-Cryptocurrency Feeds: Real-time price updates fetched via the Binance API, with an automatic fallback to the CoinGecko API to ensure constant uptime.
+The Financial Market Simulator is a high-performance, React-based trading sandbox designed for real-time asset tracking and portfolio execution. Built on a concurrent Vite and Node.js architecture, the platform streams live cryptocurrency and equity data via Binance and Stooq integrations, complete with automatic API failovers. It features a custom HTML Canvas charting engine for interactive technical analysis, alongside a robust execution panel supporting both Spot and high-leverage Futures trading. 
 
-Equity Markets: Real-time stock data delivered through a custom local API proxy routing directly to Stooq.
+## Installation
 
-Forex Matrix: Live currency exchange rates sourced via a specialized currency API, featuring dynamic fluctuation modeling calculated relative to a base USD value.
+Node.js is needed to compile and run the Market Simulator.
+Most importantly you need an environment that supports the concurrent Vite front-end and back-end micro-services. By default, the app uses an encrypted flat JSON ledger (`server/market.json`) for data persistence, which requires less setup than what a full relational schema expects.
+The easiest way to work around database configuration is to use this default JSON storage for your current session. The JSON ledger can coexist with your system without extra background services.
+Typical dependencies are installed via `npm`. If the setup reports that live data is missing, ensure your network allows connections to the Binance API, CoinGecko, or Stooq for real-time asset feeds.
 
-Interactive Charting Terminal: Custom-built HTML Canvas candle charts providing interactive zoom and pan controls, dynamic timeline scaling, live crosshair HUD tracking, and real-time technical analysis indicators (Simple Moving Averages and Bollinger Bands).
+## MySQL Database Workaround
 
-Trading Simulation Engine
-Account Ecosystem: Full support for secure user registration, session management, authenticated persistent portfolios, and initial paper-trading asset distributions.
+If you already have a MySQL database instance and want to use it instead of the JSON ledger, initialize it and point the build to it:
 
-Execution Panel: Fully operational Spot market buy and sell triggers along with a high-leverage Futures trading desk.
-
-Risk Management Systems: Advanced architectural support for real-time portfolio risk overwatch loops, tracking live automated liquidations, Stop Loss targets, and Take Profit execution boundaries on a per-second baseline clock.
-
-Transaction Ledger: Comprehensive database archiving all incoming fund deposits, spot purchases, options closures, and historical liquidations.
-
-Architecture and State Management
-State Management: Core client states, account values, current token parameters, and active transactions are centralized using a unified Zustand memory store model.
-
-Data Persistence Engine: Built with a clean, dual-driver abstractions layer. The application saves layout states locally to an encrypted flat JSON ledger by default, but it can pivot seamlessly to an enterprise relational schema without forcing front-end logic overrides.
-
-Installation and Deployment
-Ensure you have Node.js installed on your local environment before proceeding.
-
-Standard Setup
-Install the necessary dependencies and initialize the development servers:
-
-Bash
-npm install
-npm run dev
-The unified npm run dev script starts the Vite front-end client interface and launches the concurrent back-end micro-service responsible for data proxying and asset persistence.
-
-Persistent Database Engine Configuration (Optional)
-By default, the application runs entirely standalone, persisting user credentials, authorization sessions, and asset portfolios locally into a JSON storage file located at server/market.json.
-
-To scale up and pivot your configuration to a structured MySQL database instance, follow the initialization instructions below.
-
-1. Initialize the MySQL Instance
-Start your local database database service runner.
-
-On Windows (Native Service Install): Open PowerShell as an Administrator and execute:
-
-PowerShell
-Start-Service MySQL80
-Alternative Deployment via Docker (Recommended for cross-platform environments): A pre-configured container blueprint is included in the project root directory. Spin up a production-ready isolated MySQL image by running:
-
-Bash
+```bash
 docker compose up -d mysql
-2. Prepare the Database Schema
-Access your preferred database command-line interface or administration tool (such as MySQL Workbench) and execute the structural creation query:
-
-SQL
-CREATE DATABASE market_simulator
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-3. Bind Environmental Environment Variables
-Duplicate the distributed .env.example file to create a localized configurations environment file named .env:
-
-Bash
 cp .env.example .env
-Open the newly created .env file and update your variables to route through the database driver:
+```
+If your environment does not ship a .env file, set the variables manually instead:
 
-Code snippet
-DB_DRIVER=mysql
-MYSQL_HOST=127.0.0.1
-MYSQL_PORT=3306
-MYSQL_USER=your_username
-MYSQL_PASSWORD=your_secure_password
-MYSQL_DATABASE=market_simulator
-4. Run the Platform
-Launch the development workflow suite:
+```bash
+export DB_DRIVER="mysql"
+export MYSQL_HOST="127.0.0.1"
+export MYSQL_PORT="3306"
+export MYSQL_USER="your_username"
+export MYSQL_PASSWORD="your_secure_password"
+export MYSQL_DATABASE="market_simulator"
+````
+To verify the database is in use, check the connection variables and schemas:
 
-Bash
+```bash
+grep -E "DB_DRIVER|MYSQL_HOST" ".env"
+mysql -V
+mysql -u root -p -e "SHOW DATABASES;"
+```
+
+
+## Compiling
+
+To build the Market Simulator with MySQL database acceleration, use the environment from above in the same shell and then run:
+
+```bash
+npm install
+```
+
+If a MySQL instance is not available on your system, the local JSON ledger is the alternative. The key point is that one persistent storage backend must be enabled so the simulator can build portfolio states without falling back to a broken ephemeral path.
+Once configured, run the following to fully compile the application:
+```bash
+npm run build
+```
+Afterwards to not recompile everything every time you make a change, you can use the following command to only recompile based on the changed files:
+
+```bash
 npm run dev
-The back-end initialization lifecycle maps, validates, and builds all necessary relational database schemas automatically on boot.
+```
+
+## Usage
+To initialize the database tables you can use the following command:
+
+```bash
+node server/init-db.js
+```

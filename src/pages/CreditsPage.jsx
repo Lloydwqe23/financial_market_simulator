@@ -29,7 +29,7 @@ function CreditsPage() {
                                 style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent)' }}
                             />
                             <div>
-                                <strong style={{ fontSize: '1.05rem' }}>Holovin Maxim</strong>
+                                <strong style={{ fontSize: '1.05rem' }}>Holovin Maksym</strong>
                             </div>
                         </div>
                         <span className="tf-pill" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>@Lloydwqe23 ↗</span>
