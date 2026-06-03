@@ -12,15 +12,15 @@ import { usePortfolioStore } from '../store/portfolioStore';
 import { useAuthStore } from '../store/authStore';
 
 const TIMEFRAMES = [
-  { value: '1m',  label: '1m',  ms: 60 * 1000,                binanceInterval: '1m'  },
-  { value: '5m',  label: '5m',  ms: 5 * 60 * 1000,            binanceInterval: '5m'  },
-  { value: '15m', label: '15m', ms: 15 * 60 * 1000,           binanceInterval: '15m' },
-  { value: '30m', label: '30m', ms: 30 * 60 * 1000,           binanceInterval: '30m' },
-  { value: '1h',  label: '1h',  ms: 60 * 60 * 1000,           binanceInterval: '1h'  },
-  { value: '4h',  label: '4h',  ms: 4 * 60 * 60 * 1000,       binanceInterval: '4h'  },
-  { value: '1d',  label: '1D',  ms: 24 * 60 * 60 * 1000,      binanceInterval: '1d'  },
-  { value: '1w',  label: '1W',  ms: 7 * 24 * 60 * 60 * 1000,  binanceInterval: '1w'  },
-  { value: '1M',  label: '1M',  ms: 30 * 24 * 60 * 60 * 1000, binanceInterval: '1M'  },
+  { value: '1m', label: '1m', ms: 60 * 1000, binanceInterval: '1m' },
+  { value: '5m', label: '5m', ms: 5 * 60 * 1000, binanceInterval: '5m' },
+  { value: '15m', label: '15m', ms: 15 * 60 * 1000, binanceInterval: '15m' },
+  { value: '30m', label: '30m', ms: 30 * 60 * 1000, binanceInterval: '30m' },
+  { value: '1h', label: '1h', ms: 60 * 60 * 1000, binanceInterval: '1h' },
+  { value: '4h', label: '4h', ms: 4 * 60 * 60 * 1000, binanceInterval: '4h' },
+  { value: '1d', label: '1D', ms: 24 * 60 * 60 * 1000, binanceInterval: '1d' },
+  { value: '1w', label: '1W', ms: 7 * 24 * 60 * 60 * 1000, binanceInterval: '1w' },
+  { value: '1M', label: '1M', ms: 30 * 24 * 60 * 60 * 1000, binanceInterval: '1M' },
 ];
 
 const PRESET_COLORS = ['#eab308', '#3b82f6', '#ec4899', '#a855f7', '#10b981', '#f43f5e', '#06b6d4'];
@@ -35,13 +35,13 @@ function getTimeframeConfig(value) {
 
 function getCoinGeckoDays(value) {
   switch (value) {
-    case '1m':  return 1;
-    case '5m':  return 7;
+    case '1m': return 1;
+    case '5m': return 7;
     case '15m':
     case '30m': return 30;
-    case '1h':  return 90;
-    case '4h':  return 180;
-    default:    return 365;
+    case '1h': return 90;
+    case '4h': return 180;
+    default: return 365;
   }
 }
 
@@ -72,24 +72,24 @@ function resampleDailyCandles(dailyCandles, intervalMs, seed) {
       if (!existing) {
         buckets.set(bucket, { t: bucket, open: c.open, high: c.high, low: c.low, close: c.close });
       } else {
-        existing.high  = Math.max(existing.high, c.high);
-        existing.low   = Math.min(existing.low,  c.low);
+        existing.high = Math.max(existing.high, c.high);
+        existing.low = Math.min(existing.low, c.low);
         existing.close = c.close;
       }
     }
     return Array.from(buckets.values()).sort((a, b) => a.t - b.t);
   }
 
-  const rng      = mulberry32(seed);
+  const rng = mulberry32(seed);
   const stepsPerDay = Math.round(DAY_MS / intervalMs);
-  const result   = [];
+  const result = [];
 
   for (const daily of dailyCandles) {
-    const dayOpen  = daily.open;
+    const dayOpen = daily.open;
     const dayClose = daily.close;
-    const dayHigh  = daily.high;
-    const dayLow   = daily.low;
-    const range    = dayHigh - dayLow || dayOpen * 0.002;
+    const dayHigh = daily.high;
+    const dayLow = daily.low;
+    const range = dayHigh - dayLow || dayOpen * 0.002;
 
     const rawWalk = [0];
     for (let i = 1; i < stepsPerDay; i++) {
@@ -103,19 +103,19 @@ function resampleDailyCandles(dailyCandles, intervalMs, seed) {
 
     const prices = rawWalk.map((w, i) => {
       const progress = i / stepsPerDay;
-      const trend    = dayOpen + (dayClose - dayOpen) * progress;
-      const noise    = ((w - minW) / walkRange - 0.5) * range * 0.7;
+      const trend = dayOpen + (dayClose - dayOpen) * progress;
+      const noise = ((w - minW) / walkRange - 0.5) * range * 0.7;
       return clamp(trend + noise, dayLow, dayHigh);
     });
-    prices[0]                  = dayOpen;
-    prices[stepsPerDay - 1]    = dayClose;
+    prices[0] = dayOpen;
+    prices[stepsPerDay - 1] = dayClose;
 
     for (let i = 0; i < stepsPerDay; i++) {
-      const t     = daily.t + i * intervalMs;
-      const open  = prices[i];
+      const t = daily.t + i * intervalMs;
+      const open = prices[i];
       const close = prices[i + 1] ?? dayClose;
-      const high  = Math.max(open, close) * (1 + rng() * 0.003);
-      const low   = Math.min(open, close) * (1 - rng() * 0.003);
+      const high = Math.max(open, close) * (1 + rng() * 0.003);
+      const low = Math.min(open, close) * (1 - rng() * 0.003);
       result.push({ t, open, high: Math.min(high, dayHigh), low: Math.max(low, dayLow), close });
     }
   }
@@ -170,28 +170,28 @@ function resamplePricesToCandles(prices, intervalMs) {
 
 function buildSyntheticCandles({ seed, endPrice, candleMs, count = 1000, baseVolatility = 0.002 }) {
   const price = Number(endPrice);
-  const ms    = Number(candleMs);
+  const ms = Number(candleMs);
   if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(ms) || ms <= 0) return [];
 
-  const rng       = mulberry32(seed);
-  const count_    = clamp(Number(count) || 0, 20, 2000);
-  const hourMs    = 60 * 60 * 1000;
+  const rng = mulberry32(seed);
+  const count_ = clamp(Number(count) || 0, 20, 2000);
+  const hourMs = 60 * 60 * 1000;
   const stepFactor = Math.sqrt(ms / hourMs);
-  const vol       = clamp(baseVolatility * stepFactor, baseVolatility * 0.35, baseVolatility * 10);
-  const wickVol   = vol * 0.8;
+  const vol = clamp(baseVolatility * stepFactor, baseVolatility * 0.35, baseVolatility * 10);
+  const wickVol = vol * 0.8;
   const endBucket = Math.floor(Date.now() / ms) * ms;
 
   let close = price;
   const backwards = [];
 
   for (let step = 0; step < count_; step++) {
-    const t     = endBucket - step * ms;
+    const t = endBucket - step * ms;
     const delta = (rng() - 0.5) * 2 * vol;
-    const open  = Math.max(1e-9, close / (1 + delta));
+    const open = Math.max(1e-9, close / (1 + delta));
     const bodyHigh = Math.max(open, close);
-    const bodyLow  = Math.min(open, close);
-    const high  = bodyHigh * (1 + rng() * wickVol);
-    const low   = Math.max(1e-9, bodyLow * (1 - rng() * wickVol));
+    const bodyLow = Math.min(open, close);
+    const high = bodyHigh * (1 + rng() * wickVol);
+    const low = Math.max(1e-9, bodyLow * (1 - rng() * wickVol));
     backwards.push({ t, open, high, low, close });
     close = open;
   }
@@ -199,32 +199,33 @@ function buildSyntheticCandles({ seed, endPrice, candleMs, count = 1000, baseVol
 }
 
 function AssetDetailPage() {
-  const navigate    = useNavigate();
-  const params      = useParams();
-  const assetType   = String(params.type || '').toLowerCase();
-  const assetId     = decodeURIComponent(String(params.id || ''));
+  const navigate = useNavigate();
+  const params = useParams();
+  const assetType = String(params.type || '').toLowerCase();
+  const assetId = decodeURIComponent(String(params.id || ''));
 
-  const cryptoAssets     = useMarketStore((s) => s.cryptoAssets);
-  const stockAssets      = useMarketStore((s) => s.stockAssets);
-  const currencyBase     = useMarketStore((s) => s.currencyBase);
-  const currencyRates    = useMarketStore((s) => s.currencyRates);
-  const currencyChanges  = useMarketStore((s) => s.currencyChanges);
-  const currencyStatus   = useMarketStore((s) => s.currencyStatus);
+  const cryptoAssets = useMarketStore((s) => s.cryptoAssets);
+  const stockAssets = useMarketStore((s) => s.stockAssets);
+  const currencyBase = useMarketStore((s) => s.currencyBase);
+  const currencyRates = useMarketStore((s) => s.currencyRates);
+  const currencyChanges = useMarketStore((s) => s.currencyChanges);
+  const currencyStatus = useMarketStore((s) => s.currencyStatus);
 
-  const loadCryptoAssets  = useMarketStore((s) => s.loadCryptoAssets);
-  const loadStockAssets   = useMarketStore((s) => s.loadStockAssets);
+  const loadCryptoAssets = useMarketStore((s) => s.loadCryptoAssets);
+  const loadStockAssets = useMarketStore((s) => s.loadStockAssets);
   const loadCurrencyRates = useMarketStore((s) => s.loadCurrencyRates);
 
-  const balance         = usePortfolioStore((s) => s.balance);
-  const buyAsset        = usePortfolioStore((s) => s.buyAsset);
-  const sellAsset       = usePortfolioStore((s) => s.sellAsset);
+  const balance = usePortfolioStore((s) => s.balance);
+  const buyAsset = usePortfolioStore((s) => s.buyAsset);
+  const sellAsset = usePortfolioStore((s) => s.sellAsset);
   const syncMarketPrices = usePortfolioStore((s) => s.syncMarketPrices);
-  const holdings        = usePortfolioStore((s) => s.holdings);
+  const holdings = usePortfolioStore((s) => s.holdings);
+  const pendingOrders = usePortfolioStore((s) => s.pendingOrders);
+  const cancelOrder = usePortfolioStore((s) => s.cancelOrder);
 
   const authUser = useAuthStore((s) => s.user);
   const activeUserBalance = authUser ? balance : 0;
 
-  // Trigger Modifier Hooks
   const updatePositionTriggers = usePortfolioStore((s) => s.updatePositionTriggers);
   const [editingPositionId, setEditingPositionId] = useState(null);
   const [localSL, setLocalSL] = useState('');
@@ -245,12 +246,12 @@ function AssetDetailPage() {
     setEditingPositionId(null);
   };
 
-  const [timeframe, setTimeframe]       = useState('15m');
-  const tfConfig   = useMemo(() => getTimeframeConfig(timeframe), [timeframe]);
+  const [timeframe, setTimeframe] = useState('15m');
+  const tfConfig = useMemo(() => getTimeframeConfig(timeframe), [timeframe]);
   const timeframeMs = tfConfig?.ms || 15 * 60 * 1000;
 
-  const [tick, setTick]               = useState(0);
-  const [candles, setCandles]         = useState([]);
+  const [tick, setTick] = useState(0);
+  const [candles, setCandles] = useState([]);
   const [historyReady, setHistoryReady] = useState(false);
 
   const stockDailyCache = useRef(null);
@@ -261,9 +262,9 @@ function AssetDetailPage() {
 
   const addIndicatorInstance = (type) => {
     const defaultColor = type === 'rsi' ? '#a855f7' : type === 'macd' ? '#06b6d4' : PRESET_COLORS[activeIndicators.length % PRESET_COLORS.length];
-    
+
     if ((type === 'rsi' || type === 'macd') && activeIndicators.some(i => i.type === type)) {
-      return; 
+      return;
     }
 
     const newInstance = {
@@ -298,6 +299,14 @@ function AssetDetailPage() {
     });
   }, [holdings, assetId]);
 
+  const activePendingOrders = useMemo(() => {
+    if (!Array.isArray(pendingOrders)) return [];
+    return pendingOrders.filter((item) => {
+      if (!item) return false;
+      return item.assetId === assetId;
+    });
+  }, [pendingOrders, assetId]);
+
   useEffect(() => {
     const id = window.setInterval(() => setTick((v) => v + 1), 1000);
     return () => window.clearInterval(id);
@@ -309,9 +318,9 @@ function AssetDetailPage() {
   }, [assetId, assetType, currencyBase, timeframe]);
 
   useEffect(() => {
-    let mounted   = true;
-    let timerId   = 0;
-    let inFlight  = false;
+    let mounted = true;
+    let timerId = 0;
+    let inFlight = false;
 
     const loop = async () => {
       if (inFlight) return;
@@ -326,14 +335,14 @@ function AssetDetailPage() {
         } else if (assetType === 'currency') {
           await loadCurrencyRates(currencyBase || 'USD');
           if (mounted) {
-            const base        = currencyBase || 'USD';
-            const usdPerBase  = base === 'USD' ? 1 : Number(useMarketStore.getState().currencyRates?.usd);
-            const okUsdBase   = Number.isFinite(usdPerBase) && usdPerBase > 0 ? usdPerBase : null;
+            const base = currencyBase || 'USD';
+            const usdPerBase = base === 'USD' ? 1 : Number(useMarketStore.getState().currencyRates?.usd);
+            const okUsdBase = Number.isFinite(usdPerBase) && usdPerBase > 0 ? usdPerBase : null;
             if (okUsdBase) {
               const fxAssets = CURRENCIES.map((code) => {
-                const codeLow    = code.toLowerCase();
+                const codeLow = code.toLowerCase();
                 const baseToCode = Number(useMarketStore.getState().currencyRates?.[codeLow]);
-                const priceUsd   = Number.isFinite(baseToCode) && baseToCode > 0 ? okUsdBase / baseToCode : null;
+                const priceUsd = Number.isFinite(baseToCode) && baseToCode > 0 ? okUsdBase / baseToCode : null;
                 return { id: `fx-${codeLow}`, symbol: codeLow, name: code, type: 'currency', price: priceUsd || 0, change24h: 0 };
               }).filter((a) => a.price > 0);
               syncMarketPrices(fxAssets);
@@ -352,20 +361,20 @@ function AssetDetailPage() {
   }, [assetType, currencyBase, loadCryptoAssets, loadCurrencyRates, loadStockAssets, syncMarketPrices]);
 
   const displayAsset = useMemo(() => {
-    if (assetType === 'crypto')  return cryptoAssets.find((a) => a.id === assetId) ?? null;
-    if (assetType === 'stock')   return stockAssets.find((a) => a.id === assetId) ?? null;
+    if (assetType === 'crypto') return cryptoAssets.find((a) => a.id === assetId) ?? null;
+    if (assetType === 'stock') return stockAssets.find((a) => a.id === assetId) ?? null;
     if (assetType === 'currency') {
       const codeLow = assetId.replace(/^fx-/, '').toLowerCase();
-      const base    = currencyBase || 'USD';
+      const base = currencyBase || 'USD';
       if (codeLow === base.toLowerCase()) {
         return { id: `fx-${codeLow}`, symbol: codeLow, name: codeLow.toUpperCase(), type: 'currency', price: 1, change24h: 0, quoteCurrency: base, priceUsd: base === 'USD' ? 1 : Number(currencyRates?.usd) || 0 };
       }
-      const baseToCode   = Number(currencyRates?.[codeLow]);
+      const baseToCode = Number(currencyRates?.[codeLow]);
       if (!Number.isFinite(baseToCode) || baseToCode <= 0) return null;
-      const usdPerBase   = base === 'USD' ? 1 : Number(currencyRates?.usd);
+      const usdPerBase = base === 'USD' ? 1 : Number(currencyRates?.usd);
       const okUsdPerBase = Number.isFinite(usdPerBase) && usdPerBase > 0 ? usdPerBase : null;
       if (!okUsdPerBase) return null;
-      const pulse        = Math.sin((tick + hashCurrency(`${base}-${codeLow}`)) / 6) * 0.0006;
+      const pulse = Math.sin((tick + hashCurrency(`${base}-${codeLow}`)) / 6) * 0.0006;
       return { id: `fx-${codeLow}`, symbol: codeLow, name: codeLow.toUpperCase(), type: 'currency', price: (1 / baseToCode) * (1 + pulse), change24h: (-Number(currencyChanges?.[codeLow] || 0)) + pulse * 100, quoteCurrency: base, priceUsd: (okUsdPerBase / baseToCode) * (1 + pulse) };
     }
     return null;
@@ -386,7 +395,7 @@ function AssetDetailPage() {
             return;
           }
           const prices = await fetchCoinGeckoMarketChart({ id: String(displayAsset.id), days: getCoinGeckoDays(tfConfig.value) });
-          const next   = resamplePricesToCandles(prices, timeframeMs);
+          const next = resamplePricesToCandles(prices, timeframeMs);
           if (mounted) { setCandles(next); setHistoryReady(true); }
           return;
         }
@@ -492,9 +501,9 @@ function AssetDetailPage() {
           </div>
 
           <div style={{ position: 'relative' }}>
-            <button 
-              type="button" 
-              className="tf-pill" 
+            <button
+              type="button"
+              className="tf-pill"
               style={{ borderColor: activeIndicators.length > 0 ? 'var(--accent)' : 'var(--border)', color: activeIndicators.length > 0 ? 'var(--accent)' : 'var(--text)' }}
               onClick={() => setShowIndicatorMenu(!showIndicatorMenu)}
             >
@@ -502,10 +511,10 @@ function AssetDetailPage() {
             </button>
 
             {showIndicatorMenu && (
-              <div 
-                className="helper-box" 
-                style={{ 
-                  position: 'absolute', right: 0, top: '40px', zIndex: 110, width: '330px', 
+              <div
+                className="helper-box"
+                style={{
+                  position: 'absolute', right: 0, top: '40px', zIndex: 110, width: '330px',
                   background: 'rgba(7, 17, 31, 0.98)', backdropFilter: 'blur(10px)',
                   boxShadow: 'var(--shadow)', padding: '14px', display: 'grid', gap: '10px',
                   maxHeight: '480px', overflowY: 'auto'
@@ -523,14 +532,14 @@ function AssetDetailPage() {
                   <>
                     <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '4px 0' }} />
                     <strong style={{ fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase' }}>Active Chart Layers</strong>
-                    
+
                     <div style={{ display: 'grid', gap: '8px' }}>
                       {activeIndicators.map((ind) => (
-                        <div 
-                          key={ind.id} 
-                          style={{ 
-                            background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', 
-                            borderRadius: '8px', padding: '8px', display: 'grid', gap: '6px' 
+                        <div
+                          key={ind.id}
+                          style={{
+                            background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
+                            borderRadius: '8px', padding: '8px', display: 'grid', gap: '6px'
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -540,8 +549,8 @@ function AssetDetailPage() {
                               {ind.type === 'rsi' && '⚛ Relative Strength Index (RSI)'}
                               {ind.type === 'macd' && '⚡ MACD'}
                             </span>
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               style={{ background: 'transparent', border: 0, color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem' }}
                               onClick={() => removeIndicatorInstance(ind.id)}
                             >
@@ -553,12 +562,12 @@ function AssetDetailPage() {
                             {(ind.type === 'ma' || ind.type === 'bb' || ind.type === 'rsi') && (
                               <label style={{ flex: '1 1 70px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 Period
-                                <input 
-                                  type="number" 
+                                <input
+                                  type="number"
                                   className="market-search-input"
                                   style={{ padding: '4px 6px', fontSize: '0.8rem' }}
                                   min="2" max="500"
-                                  value={ind.period} 
+                                  value={ind.period}
                                   onChange={(e) => updateIndicatorParameter(ind.id, 'period', Math.max(2, Number(e.target.value)))}
                                 />
                               </label>
@@ -567,12 +576,12 @@ function AssetDetailPage() {
                             {ind.type === 'bb' && (
                               <label style={{ flex: '1 1 70px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 Std Dev
-                                <input 
-                                  type="number" 
+                                <input
+                                  type="number"
                                   className="market-search-input"
                                   style={{ padding: '4px 6px', fontSize: '0.8rem' }}
                                   min="0.5" max="5" step="0.5"
-                                  value={ind.stdDev} 
+                                  value={ind.stdDev}
                                   onChange={(e) => updateIndicatorParameter(ind.id, 'stdDev', Number(e.target.value))}
                                 />
                               </label>
@@ -597,10 +606,10 @@ function AssetDetailPage() {
 
                             <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginLeft: 'auto' }}>
                               Color
-                              <input 
-                                type="color" 
+                              <input
+                                type="color"
                                 style={{ width: '28px', height: '22px', border: 0, padding: 0, background: 'transparent', cursor: 'pointer' }}
-                                value={ind.color} 
+                                value={ind.color}
                                 onChange={(e) => updateIndicatorParameter(ind.id, 'color', e.target.value)}
                               />
                             </label>
@@ -624,10 +633,11 @@ function AssetDetailPage() {
 
       <div className="surface">
         <h3>Your Active {displayAsset.name} Positions</h3>
-        {activeAssetHoldings.length === 0 ? (
-          <div className="empty-state">You do not hold any active spot positions or open futures contracts.</div>
+        {activeAssetHoldings.length === 0 && activePendingOrders.length === 0 ? (
+          <div className="empty-state">You do not hold any active spot positions, open futures contracts, or pending limit orders.</div>
         ) : (
           <div className="section-list">
+
             {activeAssetHoldings.map((holding) => {
               const isFutures = holding.instrumentType === 'futures';
               const isEditing = editingPositionId === holding.id;
@@ -654,11 +664,11 @@ function AssetDetailPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <strong style={{ textTransform: 'uppercase' }}>{holding.symbol}</strong>
                         <span className="auth-pill" style={{ fontSize: '0.65rem', padding: '2px 8px' }}>
-                          {isFutures ? `${holding.direction.toUpperCase()} ${holding.leverage}x FUTURES` : 'SPOT'}
+                          {isFutures ? `${holding.direction.toUpperCase()} ${holding.leverage}x FUTURES` : holding.instrumentType === 'earn' ? 'EARN (12% APY)' : 'SPOT'}
                         </span>
                       </div>
                       <small style={{ marginTop: '4px', display: 'block' }}>
-                        {isFutures 
+                        {isFutures
                           ? `Size: ${holding.quantity || 0} | Avg Entry: $${Number(holding.averagePrice || 0).toFixed(2)} | Current: $${Number(holding.currentPrice || 0).toFixed(2)}`
                           : `Quantity: ${holding.quantity || 0} | Avg Cost: $${Number(holding.averagePrice || 0).toFixed(2)} | Current Price: $${Number(holding.currentPrice || 0).toFixed(2)}`
                         }
@@ -671,7 +681,7 @@ function AssetDetailPage() {
                         </div>
                       )}
                     </div>
-                    
+
                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <strong>${totalDisplayValue.toFixed(2)}</strong>
                       <span className={pnlClass} style={{ fontSize: '0.8rem', fontWeight: '600' }}>
@@ -707,6 +717,38 @@ function AssetDetailPage() {
                 </div>
               );
             })}
+
+            {activePendingOrders.length > 0 && (
+              <>
+                <h4 style={{ color: '#a855f7', fontSize: '0.85rem', marginTop: '16px', marginBottom: '8px', textTransform: 'uppercase' }}>Awaiting Execution</h4>
+                {activePendingOrders.map((order) => (
+                  <div key={order.id} className="section-list" style={{ background: 'rgba(255, 255, 255, 0.01)', padding: '12px', borderRadius: '16px', border: '1px dashed #a855f7', marginBottom: '8px' }}>
+                    <div className="list-item" style={{ border: '0', background: 'transparent', padding: 0, borderLeft: `4px solid #a855f7`, paddingLeft: '12px' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <strong style={{ textTransform: 'uppercase' }}>{order.symbol}</strong>
+                          <span className="auth-pill" style={{ fontSize: '0.65rem', padding: '2px 8px', background: 'rgba(168, 85, 247, 0.15)', color: '#d8b4fe', borderColor: 'rgba(168, 85, 247, 0.4)', borderStyle: 'solid', borderWidth: '1px' }}>
+                            AWAITING LIMIT {order.direction.toUpperCase()}
+                          </span>
+                        </div>
+                        <small style={{ marginTop: '4px', display: 'block' }}>
+                          Target Execution Price: ${order.limitPrice.toFixed(2)}
+                        </small>
+                        <small style={{ display: 'block' }}>
+                          Reserved Quantity: {order.quantity} | Instrument: {order.instrumentType.toUpperCase()}
+                        </small>
+                      </div>
+                      <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <button type="button" className="ghost-button" style={{ color: 'var(--danger)', padding: '6px 12px', fontSize: '0.75rem', margin: 0 }} onClick={() => cancelOrder(order.id)}>
+                          Cancel Order
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+
           </div>
         )}
       </div>

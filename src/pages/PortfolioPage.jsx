@@ -6,6 +6,8 @@ function PortfolioPage() {
   const balance = usePortfolioStore((state) => state.balance);
   const holdings = usePortfolioStore((state) => state.holdings);
   const transactions = usePortfolioStore((state) => state.transactions);
+  const pendingOrders = usePortfolioStore((state) => state.pendingOrders);
+  const cancelOrder = usePortfolioStore((state) => state.cancelOrder);
   const syncMarketPrices = usePortfolioStore((state) => state.syncMarketPrices);
 
   const loadCryptoAssets = useMarketStore((state) => state.loadCryptoAssets);
@@ -93,16 +95,16 @@ function PortfolioPage() {
 
   const groupedHoldings = useMemo(() => {
     const categories = {
-      crypto: { stock: [], futures: [] },
-      stock: { stock: [], futures: [] },
-      currency: { stock: [], futures: [] },
+      crypto: { stock: [], futures: [], earn: [] },
+      stock: { stock: [], futures: [], earn: [] },
+      currency: { stock: [], futures: [], earn: [] },
     };
 
     holdings.forEach((holding) => {
       let cat = holding.type === 'stocks' ? 'stock' : holding.type;
-      if (!categories[cat]) categories[cat] = { stock: [], futures: [] };
+      if (!categories[cat]) categories[cat] = { stock: [], futures: [], earn: [] };
 
-      const instType = holding.instrumentType === 'futures' ? 'futures' : 'stock';
+      const instType = holding.instrumentType;
       categories[cat][instType].push(holding);
     });
 
@@ -120,6 +122,7 @@ function PortfolioPage() {
         <div className="section-list">
           {items.map((holding) => {
             const isFutures = holding.instrumentType === 'futures';
+            const isEarn = holding.instrumentType === 'earn';
 
             let displayPnL = 0;
             let totalDisplayValue = 0;
@@ -143,7 +146,7 @@ function PortfolioPage() {
                     <strong>
                       {holding.name} ({holding.symbol.toUpperCase()})
                     </strong>
-                    {isFutures && (
+                    {isFutures ? (
                       <span
                         className="auth-pill"
                         style={{
@@ -158,12 +161,31 @@ function PortfolioPage() {
                       >
                         {holding.direction?.toUpperCase()} {holding.leverage}x
                       </span>
+                    ) : isEarn ? (
+                      <span
+                        className="auth-pill"
+                        style={{
+                          fontSize: '0.65rem',
+                          padding: '2px 8px',
+                          background: 'rgba(247, 185, 85, 0.16)',
+                          color: 'var(--auth-accent)',
+                          borderColor: 'rgba(247, 185, 85, 0.3)',
+                          borderStyle: 'solid',
+                          borderWidth: '1px'
+                        }}
+                      >
+                        EARN (12% APY)
+                      </span>
+                    ) : (
+                      <span className="auth-pill" style={{ fontSize: '0.65rem', padding: '2px 8px' }}>SPOT</span>
                     )}
                   </div>
                   <small style={{ marginTop: '4px', display: 'block' }}>
                     {isFutures
                       ? `Contracts: ${holding.quantity} | Entry: $${holding.averagePrice.toFixed(2)} | Collateral Margin: $${holding.margin.toFixed(2)}`
-                      : `Quantity: ${holding.quantity} | Avg: $${holding.averagePrice.toFixed(2)}`
+                      : isEarn
+                        ? `Staked: ${Number(holding.quantity).toFixed(6)} | Avg: $${holding.averagePrice.toFixed(2)}`
+                        : `Quantity: ${holding.quantity} | Avg: $${holding.averagePrice.toFixed(2)}`
                     }
                     {` | Current: $${holding.currentPrice.toFixed(2)}`}
                   </small>
@@ -183,11 +205,37 @@ function PortfolioPage() {
     );
   };
 
+  const exportTransactionsToCSV = () => {
+    if (transactions.length === 0) return;
+    const headers = ['ID', 'Date/Time', 'Action Type', 'Asset', 'Symbol', 'Instrument', 'Quantity', 'Price', 'Total Value'];
+
+    const rows = transactions.map(t => [
+      t.id,
+      `"${t.time}"`,
+      t.type.toUpperCase(),
+      `"${t.assetName}"`,
+      t.symbol.toUpperCase(),
+      t.instrumentType,
+      t.quantity,
+      t.price,
+      t.total.toFixed(2)
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `trade_history_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <section className="page-grid">
       <div className="surface">
 
-        {/* --- UPDATED HERO SECTION --- */}
         <div className="hero">
           <div className="hero-title-row">
             <h2>Portfolio</h2>
@@ -201,7 +249,6 @@ function PortfolioPage() {
             </div>
           </div>
         </div>
-        {/* ---------------------------- */}
 
         <div className="grid-cards" style={{ marginBottom: 24 }}>
           <div className="asset-card">
@@ -251,28 +298,31 @@ function PortfolioPage() {
         ) : (
           <div>
             {(activeCategory === 'all' || activeCategory === 'crypto') &&
-              (groupedHoldings.crypto.stock.length > 0 || groupedHoldings.crypto.futures.length > 0) && (
+              (groupedHoldings.crypto.stock.length > 0 || groupedHoldings.crypto.futures.length > 0 || groupedHoldings.crypto.earn.length > 0) && (
                 <div style={{ marginBottom: '24px' }}>
                   <h4>Cryptocurrency Ledger</h4>
                   {renderSubSection('Spot Asset Positions', groupedHoldings.crypto.stock)}
+                  {renderSubSection('Earn Accounts (Staking)', groupedHoldings.crypto.earn)}
                   {renderSubSection('Derivative Futures Contracts', groupedHoldings.crypto.futures)}
                 </div>
               )}
 
             {(activeCategory === 'all' || activeCategory === 'stock') &&
-              (groupedHoldings.stock.stock.length > 0 || groupedHoldings.stock.futures.length > 0) && (
+              (groupedHoldings.stock.stock.length > 0 || groupedHoldings.stock.futures.length > 0 || groupedHoldings.stock.earn.length > 0) && (
                 <div style={{ marginBottom: '24px' }}>
                   <h4>Equity Shares</h4>
                   {renderSubSection('Standard Equity Shares', groupedHoldings.stock.stock)}
+                  {renderSubSection('Earn Accounts (Staking)', groupedHoldings.stock.earn)}
                   {renderSubSection('Stock Index Futures', groupedHoldings.stock.futures)}
                 </div>
               )}
 
             {(activeCategory === 'all' || activeCategory === 'currency') &&
-              (groupedHoldings.currency.stock.length > 0 || groupedHoldings.currency.futures.length > 0) && (
+              (groupedHoldings.currency.stock.length > 0 || groupedHoldings.currency.futures.length > 0 || groupedHoldings.currency.earn.length > 0) && (
                 <div style={{ marginBottom: '24px' }}>
                   <h4>Forex Matrix</h4>
                   {renderSubSection('Spot Currency Holdings', groupedHoldings.currency.stock)}
+                  {renderSubSection('Earn Accounts (Staking)', groupedHoldings.currency.earn)}
                   {renderSubSection('Currency Futures Options', groupedHoldings.currency.futures)}
                 </div>
               )}
@@ -284,35 +334,66 @@ function PortfolioPage() {
         </div>
       </div>
 
-      <div className="surface">
-        <h3>Transaction history</h3>
+      <div className="surface" style={{ marginTop: '24px' }}>
+        {pendingOrders.length > 0 && (
+          <div style={{ marginBottom: '32px' }}>
+            <h4 style={{ marginBottom: '16px', color: 'var(--accent)' }}>Pending Limit Orders</h4>
+            <div className="section-list">
+              {pendingOrders.map(order => (
+                <div className="list-item" key={order.id} style={{ borderLeft: '3px solid var(--accent)', paddingLeft: '12px' }}>
+                  <div>
+                    <strong>{order.direction.toUpperCase()} {order.name} ({order.instrumentType})</strong>
+                    <small style={{ display: 'block', marginTop: '4px' }}>
+                      Qty: {order.quantity} {order.symbol.toUpperCase()} | Target: ${order.limitPrice.toFixed(2)}
+                    </small>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <button type="button" className="tf-pill" style={{ color: 'var(--danger)', borderColor: 'var(--danger)', padding: '4px 10px', fontSize: '0.7rem' }} onClick={() => cancelOrder(order.id)}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ margin: 0 }}>Transaction history</h3>
+          <button type="button" className="tf-pill" onClick={exportTransactionsToCSV} disabled={transactions.length === 0} style={{ padding: '6px 12px', fontSize: '0.75rem', borderColor: 'var(--border)' }}>
+            Export CSV Data
+          </button>
+        </div>
+
         {transactions.length === 0 ? (
           <div className="empty-state">Transactions will appear after your first buy or sell.</div>
         ) : (
           <div className="section-list">
             {transactions.map((transaction) => {
               let isOutflow = false;
+              let isNeutral = false;
               let absoluteValue = Math.abs(transaction.total);
 
-              if (transaction.type === 'buy' || transaction.type === 'deposit') {
-                isOutflow = transaction.type === 'buy';
+              if (transaction.type === 'buy' || transaction.type === 'limit_placed') {
+                isOutflow = true;
               } else if (transaction.type === 'futures_close') {
                 isOutflow = transaction.total < 0;
+              } else if (transaction.type === 'limit_filled_buy') {
+                isNeutral = true;
               }
 
-              const displaySign = isOutflow ? '-' : '+';
-              const displayClass = isOutflow ? 'negative' : 'positive';
+              const displaySign = isNeutral ? '' : isOutflow ? '-' : '+';
+              const displayClass = isNeutral ? 'asset-meta' : isOutflow ? 'negative' : 'positive';
+
+              const titlePrefix = transaction.type === 'buy' || transaction.type === 'sell' ? transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1) : '';
 
               return (
                 <div className="list-item" key={transaction.id}>
                   <div>
                     <strong>
-                      {transaction.type === 'buy' ? 'Buy' : transaction.type === 'sell' ? 'Sell' : 'Close'} {transaction.assetName}
-                      {transaction.instrumentType === 'futures' && (
-                        <span className="asset-meta" style={{ fontSize: '0.75rem', marginLeft: '6px' }}>
-                          (futures)
-                        </span>
-                      )}
+                      {titlePrefix} {transaction.assetName}
+                      {transaction.instrumentType === 'futures' && <span className="asset-meta" style={{ fontSize: '0.75rem', marginLeft: '6px' }}>(futures)</span>}
+                      {transaction.instrumentType === 'earn' && <span className="asset-meta" style={{ fontSize: '0.75rem', marginLeft: '6px', color: 'var(--auth-accent)' }}>(earn)</span>}
                     </strong>
                     <small>
                       {transaction.quantity} {transaction.symbol.toUpperCase()} • {transaction.time}

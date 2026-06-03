@@ -1,10 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { usePortfolioStore } from '../store/portfolioStore';
 
 function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
   const [amount, setAmount] = useState('1');
-  const [instrumentType, setInstrumentType] = useState('stock'); // 'stock' | 'futures'
+  const [instrumentType, setInstrumentType] = useState('stock'); // 'stock' | 'earn' | 'futures'
+  const [orderType, setOrderType] = useState('market'); // 'market' | 'limit'
+  const [limitPrice, setLimitPrice] = useState('');
   const [leverage, setLeverage] = useState(1);
   const [direction, setDirection] = useState('long'); // 'long' | 'short'
   const [takeProfit, setTakeProfit] = useState('');
@@ -19,15 +22,18 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
 
   const amountNumber = Number(amount) || 0;
   const assetPrice = asset.price || 0;
-  const estimatedCost = amountNumber * assetPrice;
+
+  // If it's a limit order, calculate margin based on their target price, otherwise use live price
+  const activePriceTarget = orderType === 'limit' && limitPrice ? Number(limitPrice) : assetPrice;
+  const estimatedCost = amountNumber * activePriceTarget;
   const marginRequired = instrumentType === 'futures' ? estimatedCost / leverage : estimatedCost;
 
   const liquidationPrice = useMemo(() => {
     if (instrumentType !== 'futures' || leverage <= 1) return null;
     return direction === 'long'
-      ? assetPrice * (1 - 1 / leverage)
-      : assetPrice * (1 + 1 / leverage);
-  }, [assetPrice, leverage, direction, instrumentType]);
+      ? activePriceTarget * (1 - 1 / leverage)
+      : activePriceTarget * (1 + 1 / leverage);
+  }, [activePriceTarget, leverage, direction, instrumentType]);
 
   const formatMoney = (value) => {
     const numericValue = Number(value) || 0;
@@ -39,24 +45,37 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
 
   const handleTradeSubmit = (event, actionType) => {
     event.preventDefault();
-    
+
     if (!authUser) {
       navigate('/login');
       return;
     }
 
-    if (instrumentType === 'stock') {
-      if (actionType === 'buy') onBuy(amountNumber, 'stock', {});
-      if (actionType === 'sell') onSell(amountNumber, 'stock', {});
+    const isLimit = orderType === 'limit';
+    const placeLimitOrder = usePortfolioStore.getState().placeLimitOrder;
+
+    if (instrumentType === 'stock' || instrumentType === 'earn') {
+      if (isLimit) {
+        placeLimitOrder({ asset, amount: amountNumber, instrumentType, limitPrice, direction: actionType, currentLivePrice: assetPrice });
+      } else {
+        if (actionType === 'buy') onBuy(amountNumber, instrumentType, {});
+        if (actionType === 'sell') onSell(amountNumber, instrumentType, {});
+      }
     } else {
-      onBuy(amountNumber, 'futures', {
+      const fOpts = {
         direction,
         leverage,
         takeProfit: takeProfit ? Number(takeProfit) : null,
         stopLoss: stopLoss ? Number(stopLoss) : null,
         liquidationPrice,
-        initialPrice: assetPrice
-      });
+        initialPrice: activePriceTarget
+      };
+
+      if (isLimit) {
+        placeLimitOrder({ asset, amount: amountNumber, instrumentType: 'futures', limitPrice, direction: actionType, futuresOptions: fOpts, currentLivePrice: assetPrice });
+      } else {
+        onBuy(amountNumber, 'futures', fOpts);
+      }
     }
   };
 
@@ -68,7 +87,6 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
         Balance: {formatMoney(balance)} | Required Margin: {formatMoney(marginRequired)}
       </p>
 
-      {/* Mode Switches */}
       <div className="tf-row" style={{ margin: '14px 0' }}>
         <button
           type="button"
@@ -79,6 +97,14 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
         </button>
         <button
           type="button"
+          className={`tf-pill ${instrumentType === 'earn' ? 'tf-pill--active' : ''}`}
+          onClick={() => setInstrumentType('earn')}
+          style={{ borderColor: instrumentType === 'earn' ? 'rgba(247, 185, 85, 0.5)' : '', color: instrumentType === 'earn' ? 'var(--auth-accent)' : '' }}
+        >
+          Earn (Staking)
+        </button>
+        <button
+          type="button"
           className={`tf-pill ${instrumentType === 'futures' ? 'tf-pill--active' : ''}`}
           onClick={() => setInstrumentType('futures')}
         >
@@ -86,7 +112,42 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
         </button>
       </div>
 
+      <div className="tf-row" style={{ margin: '16px 0', padding: '6px', background: 'rgba(0,0,0,0.15)', borderRadius: '12px' }}>
+        <button
+          type="button"
+          className={`tf-pill ${orderType === 'market' ? 'tf-pill--active' : ''}`}
+          style={{ flex: 1 }}
+          onClick={() => setOrderType('market')}
+        >
+          Market Order
+        </button>
+        <button
+          type="button"
+          className={`tf-pill ${orderType === 'limit' ? 'tf-pill--active' : ''}`}
+          style={{ flex: 1 }}
+          onClick={() => setOrderType('limit')}
+        >
+          Limit Order
+        </button>
+      </div>
+
       <form className="trade-form" onSubmit={(e) => e.preventDefault()}>
+
+        {orderType === 'limit' && (
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px', color: 'var(--text)' }}>
+            Target Execution Price ($)
+            <input
+              type="number"
+              min="0.00000001"
+              step="any"
+              placeholder={`Current market price: $${assetPrice.toFixed(2)}`}
+              value={limitPrice}
+              onChange={(e) => setLimitPrice(e.target.value)}
+              style={{ borderLeft: '3px solid var(--accent)' }}
+            />
+          </label>
+        )}
+
         {instrumentType === 'futures' && (
           <>
             <div className="tf-row" style={{ marginBottom: '10px' }}>
@@ -150,7 +211,7 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
         )}
 
         <label>
-          Amount
+          Amount to Trade
           <input
             type="number"
             min="0.00000001"
@@ -161,16 +222,29 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
         </label>
 
         <div className="trade-actions" style={{ marginTop: '14px' }}>
-          {instrumentType === 'stock' ? (
+          {instrumentType === 'stock' && (
             <>
               <button type="button" className="primary-button" onClick={(e) => handleTradeSubmit(e, 'buy')} disabled={!authUser}>
-                Buy Spot
+                {orderType === 'limit' ? 'Place Limit Buy' : 'Buy Spot'}
               </button>
               <button type="button" className="secondary-button" onClick={(e) => handleTradeSubmit(e, 'sell')} disabled={!authUser}>
-                Sell Spot
+                {orderType === 'limit' ? 'Place Limit Sell' : 'Sell Spot'}
               </button>
             </>
-          ) : (
+          )}
+
+          {instrumentType === 'earn' && (
+            <>
+              <button type="button" className="primary-button" style={{ background: 'linear-gradient(135deg, var(--auth-accent), #ffd38a)' }} onClick={(e) => handleTradeSubmit(e, 'buy')} disabled={!authUser}>
+                {orderType === 'limit' ? 'Limit Stake' : 'Stake (Buy)'}
+              </button>
+              <button type="button" className="secondary-button" onClick={(e) => handleTradeSubmit(e, 'sell')} disabled={!authUser}>
+                {orderType === 'limit' ? 'Limit Unstake' : 'Unstake (Sell)'}
+              </button>
+            </>
+          )}
+
+          {instrumentType === 'futures' && (
             <button
               type="button"
               className="primary-button"
@@ -182,16 +256,17 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
               onClick={(e) => handleTradeSubmit(e, 'buy')}
               disabled={!authUser}
             >
-              Open Futures Contract ({direction.toUpperCase()})
+              {orderType === 'limit' ? 'Queue Limit Contract' : `Open Futures Contract (${direction.toUpperCase()})`}
             </button>
           )}
         </div>
       </form>
 
       <p className="trade-hint" style={{ marginTop: '12px' }}>
-        {instrumentType === 'stock' 
-          ? 'Spot trading immediately allocates standard assets to your wallet balance.'
-          : 'Futures: Contract uses margin values. High volatility risk involved.'}
+        {orderType === 'limit' ? 'Limit orders hold funds in escrow until the target execution price is reached on the live market.' : ''}
+        {instrumentType === 'stock' && orderType === 'market' && 'Spot trading immediately allocates standard assets to your wallet balance.'}
+        {instrumentType === 'earn' && orderType === 'market' && 'Earn Wallet: Locked assets dynamically generate 12% APY compounded every second.'}
+        {instrumentType === 'futures' && orderType === 'market' && 'Futures: Contract uses margin values. High volatility risk involved.'}
       </p>
 
       <button type="button" className="secondary-button" style={{ width: '100%', marginTop: '8px' }} onClick={onClose}>
