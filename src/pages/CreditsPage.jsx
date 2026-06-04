@@ -62,7 +62,7 @@ function CreditsPage() {
                     </a>
                 </div>
 
-                <h3 style={{ marginBottom: '16px' }}>Technologies & Data Providers</h3>
+                <h3 style={{ marginBottom: '16px' }}>API</h3>
                 <div className="section-list">
 
                     <div className="list-item">
@@ -74,15 +74,15 @@ function CreditsPage() {
 
                     <div className="list-item">
                         <div>
-                            <strong>CoinGecko API</strong>
-                            <small style={{ display: 'block', marginTop: '4px', color: 'var(--muted)' }}>Historical market charts and altcoin metrics.</small>
+                            <strong>Yahoo API</strong>
+                            <small style={{ display: 'block', marginTop: '4px', color: 'var(--muted)' }}>Market charts and stocks prices.</small>
                         </div>
                     </div>
 
                     <div className="list-item">
                         <div>
-                            <strong>Zustand</strong>
-                            <small style={{ display: 'block', marginTop: '4px', color: 'var(--muted)' }}>High-performance, unopinionated state management for React.</small>
+                            <strong>CoinGeko API</strong>
+                            <small style={{ display: 'block', marginTop: '4px', color: 'var(--muted)' }}>Historical market charts and altcoin metrics</small>
                         </div>
                     </div>
 

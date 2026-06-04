@@ -61,8 +61,17 @@ const usePortfolioStore = create((set, get) => ({
       return { ok: false };
     }
 
-    const alreadyTriggered = (direction === 'buy' && live <= targetPrice) ||
-      (direction === 'sell' && live >= targetPrice);
+    let alreadyTriggered = false;
+    if (instrumentType === 'futures' && futuresOptions) {
+      if (futuresOptions.direction === 'long') {
+        alreadyTriggered = live <= targetPrice;
+      } else {
+        alreadyTriggered = live >= targetPrice;
+      }
+    } else {
+      alreadyTriggered = (direction === 'buy' && live <= targetPrice) ||
+                         (direction === 'sell' && live >= targetPrice);
+    }
 
     if (alreadyTriggered) {
       const state = get();
@@ -551,6 +560,31 @@ const usePortfolioStore = create((set, get) => ({
     if (persistAfter.should) {
       setTimeout(() => persistToServer(get), 0);
     }
+  },
+
+
+  updatePositionTriggers: ({ positionId, stopLoss, takeProfit }) => {
+    set((state) => {
+      const holdings = state.holdings.map((item) => {
+        if (item.id === positionId) {
+          return {
+            ...item,
+            stopLoss: stopLoss ? Number(stopLoss) : null,
+            takeProfit: takeProfit ? Number(takeProfit) : null,
+          };
+        }
+        return item;
+      });
+
+      return {
+        holdings,
+        lastMessage: `Updated risk thresholds for position contract.`,
+      };
+    });
+
+    persistToServer(get);
+
+    return { ok: true };
   },
 
   fetchFromServer: async () => {
