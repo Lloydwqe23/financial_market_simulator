@@ -11,6 +11,7 @@ import ProfilePage from './pages/ProfilePage';
 import HistoryPage from './pages/HistoryPage';
 import CreditsPage from './pages/CreditsPage';
 import StatsPage from './pages/StatsPage';
+import ReviewsPage from './pages/ReviewsPage';
 import { usePortfolioStore } from './store/portfolioStore';
 import { useAuthStore } from './store/authStore';
 
@@ -54,9 +55,13 @@ function App() {
             Portfolio
           </NavLink>
 
-          {user && (
+          {user ? (
             <NavLink to="/profile" className={({ isActive }) => (isActive ? 'active' : '')}>
               Profile
+            </NavLink>
+          ) : (
+            <NavLink to="/reviews" className={({ isActive }) => (isActive ? 'active' : '')}>
+              Reviews
             </NavLink>
           )}
         </nav>
@@ -146,6 +151,7 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/credits" element={<CreditsPage />} />
           <Route path="/stats" element={<StatsPage />} />
+          <Route path="/reviews" element={<ReviewsPage />} />
           <Route path="*" element={<Navigate to="/crypto" replace />} />
         </Routes>
       </main>

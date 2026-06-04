@@ -10,7 +10,7 @@ function StocksPage() {
   const syncMarketPrices = usePortfolioStore((state) => state.syncMarketPrices);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('none'); // 'none' | 'name' | 'changeHigh' | 'changeLow'
+  const [sortBy, setSortBy] = useState('none');
 
   useEffect(() => {
     let mounted = true;
@@ -54,12 +54,16 @@ function StocksPage() {
       );
     }
 
-    if (sortBy === 'name') {
-      result.sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sortBy === 'changeHigh') {
-      result.sort((a, b) => b.change24h - a.change24h);
+    const getVol = (asset) => asset.volume || asset.total_volume || asset.totalVolume || asset.quoteVolume || 0;
+
+    if (sortBy === 'changeHigh') {
+      result.sort((a, b) => (b.change24h || 0) - (a.change24h || 0));
     } else if (sortBy === 'changeLow') {
-      result.sort((a, b) => a.change24h - b.change24h);
+      result.sort((a, b) => (a.change24h || 0) - (b.change24h || 0));
+    } else if (sortBy === 'volumeHigh') {
+      result.sort((a, b) => getVol(b) - getVol(a));
+    } else if (sortBy === 'volumeLow') {
+      result.sort((a, b) => getVol(a) - getVol(b));
     }
 
     return result;
@@ -72,8 +76,6 @@ function StocksPage() {
 
   return (
     <section className="surface">
-
-      {/* --- UPDATED HERO SECTION --- */}
       <div className="hero">
         <div className="hero-title-row">
           <h2>Stocks</h2>
@@ -95,7 +97,6 @@ function StocksPage() {
           <span className="asset-meta">Stocks tracked: {assets.length || '...'}</span>
         </div>
       </div>
-      {/* ---------------------------- */}
 
       <div className="market-toolbar">
         <div className="filter-row-container">
@@ -109,7 +110,7 @@ function StocksPage() {
             />
           </div>
 
-          <div className="tf-row" style={{ marginBottom: 0 }}>
+          <div className="tf-row" style={{ marginBottom: 0, gap: '6px', flexWrap: 'wrap' }}>
             <button
               type="button"
               className={`tf-pill ${sortBy === 'none' ? 'tf-pill--active' : ''}`}
@@ -137,6 +138,20 @@ function StocksPage() {
               onClick={() => setSortBy('changeLow')}
             >
               Top Losers
+            </button>
+            <button
+              type="button"
+              className={`tf-pill ${sortBy === 'volumeHigh' ? 'tf-pill--active' : ''}`}
+              onClick={() => setSortBy('volumeHigh')}
+            >
+              Highest Volume
+            </button>
+            <button
+              type="button"
+              className={`tf-pill ${sortBy === 'volumeLow' ? 'tf-pill--active' : ''}`}
+              onClick={() => setSortBy('volumeLow')}
+            >
+              Lowest Volume
             </button>
           </div>
         </div>

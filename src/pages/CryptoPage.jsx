@@ -53,10 +53,16 @@ function CryptoPage() {
       );
     }
 
+    const getVol = (asset) => asset.volume || asset.total_volume || asset.totalVolume || asset.quoteVolume || 0;
+
     if (sortBy === 'changeHigh') {
-      result.sort((a, b) => b.change24h - a.change24h);
+      result.sort((a, b) => (b.change24h || 0) - (a.change24h || 0));
     } else if (sortBy === 'changeLow') {
-      result.sort((a, b) => a.change24h - b.change24h);
+      result.sort((a, b) => (a.change24h || 0) - (b.change24h || 0));
+    } else if (sortBy === 'volumeHigh') {
+      result.sort((a, b) => getVol(b) - getVol(a));
+    } else if (sortBy === 'volumeLow') {
+      result.sort((a, b) => getVol(a) - getVol(b));
     }
 
     return result;
@@ -102,28 +108,42 @@ function CryptoPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          
-          <div className="tf-row" style={{ marginBottom: 0 }}>
-            <button 
+
+          <div className="tf-row" style={{ marginBottom: 0, gap: '6px', flexWrap: 'wrap' }}>
+            <button
               type="button"
               className={`tf-pill ${sortBy === 'none' ? 'tf-pill--active' : ''}`}
               onClick={() => setSortBy('none')}
             >
               Default
             </button>
-            <button 
+            <button
               type="button"
               className={`tf-pill ${sortBy === 'changeHigh' ? 'tf-pill--active' : ''}`}
               onClick={() => setSortBy('changeHigh')}
             >
               Top Gainers
             </button>
-            <button 
+            <button
               type="button"
               className={`tf-pill ${sortBy === 'changeLow' ? 'tf-pill--active' : ''}`}
               onClick={() => setSortBy('changeLow')}
             >
               Top Losers
+            </button>
+            <button
+              type="button"
+              className={`tf-pill ${sortBy === 'volumeHigh' ? 'tf-pill--active' : ''}`}
+              onClick={() => setSortBy('volumeHigh')}
+            >
+              Highest Volume
+            </button>
+            <button
+              type="button"
+              className={`tf-pill ${sortBy === 'volumeLow' ? 'tf-pill--active' : ''}`}
+              onClick={() => setSortBy('volumeLow')}
+            >
+              Lowest Volume
             </button>
           </div>
         </div>

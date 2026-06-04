@@ -78,6 +78,16 @@ async function ensureMySqlSchema() {
       CONSTRAINT fk_portfolios_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS reviews (
+      id VARCHAR(36) PRIMARY KEY,
+      userEmail VARCHAR(320) NOT NULL,
+      rating INT NOT NULL,
+      text TEXT NOT NULL,
+      date VARCHAR(50) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 }
 
 await ensureMySqlSchema();
@@ -153,6 +163,25 @@ const statements = {
       );
     },
   },
+  insertReview: {
+    run: async (id, userEmail, rating, text, date) => {
+      await pool.execute(
+        'INSERT INTO reviews (id, userEmail, rating, text, date) VALUES (?, ?, ?, ?, ?)',
+        [id, userEmail, rating, text, date]
+      );
+    }
+  },
+  getReviews: {
+    getAll: async () => {
+      const [rows] = await pool.execute('SELECT * FROM reviews');
+      return rows.reverse();
+    }
+  },
+  deleteReview: {
+    run: async (id) => {
+      await pool.execute('DELETE FROM reviews WHERE id = ?', [id]);
+    }
+  }
 };
 
 const DEFAULT_PORTFOLIO = {
@@ -205,62 +234,62 @@ function normalizePortfolio(input) {
 
   const normalizedHoldings = Array.isArray(target?.holdings)
     ? target.holdings.map((holding) => ({
-        id: String(holding?.id || ''),
-        assetId: holding?.assetId ? String(holding.assetId) : String(holding?.id || ''),
-        symbol: String(holding?.symbol || ''),
-        name: String(holding?.name || ''),
-        quantity: Number(holding?.quantity || 0),
-        averagePrice: Number(holding?.averagePrice || 0),
-        currentPrice: Number(holding?.currentPrice || 0),
-        type: String(holding?.type || 'crypto'),
-        instrumentType: String(holding?.instrumentType || 'stock'),
-        direction: holding?.direction ? String(holding.direction) : null,
-        leverage: holding?.leverage ? Number(holding.leverage) : null,
-        margin: holding?.margin ? Number(holding.margin) : null,
-        stopLoss: holding?.stopLoss ? Number(holding.stopLoss) : null,
-        takeProfit: holding?.takeProfit ? Number(holding.takeProfit) : null,
-        liquidationPrice: holding?.liquidationPrice ? Number(holding.liquidationPrice) : null,
-        unrealizedPnL: holding?.unrealizedPnL ? Number(holding.unrealizedPnL) : 0,
-      }))
+      id: String(holding?.id || ''),
+      assetId: holding?.assetId ? String(holding.assetId) : String(holding?.id || ''),
+      symbol: String(holding?.symbol || ''),
+      name: String(holding?.name || ''),
+      quantity: Number(holding?.quantity || 0),
+      averagePrice: Number(holding?.averagePrice || 0),
+      currentPrice: Number(holding?.currentPrice || 0),
+      type: String(holding?.type || 'crypto'),
+      instrumentType: String(holding?.instrumentType || 'stock'),
+      direction: holding?.direction ? String(holding.direction) : null,
+      leverage: holding?.leverage ? Number(holding.leverage) : null,
+      margin: holding?.margin ? Number(holding.margin) : null,
+      stopLoss: holding?.stopLoss ? Number(holding.stopLoss) : null,
+      takeProfit: holding?.takeProfit ? Number(holding.takeProfit) : null,
+      liquidationPrice: holding?.liquidationPrice ? Number(holding.liquidationPrice) : null,
+      unrealizedPnL: holding?.unrealizedPnL ? Number(holding.unrealizedPnL) : 0,
+    }))
     : [];
 
   const normalizedTransactions = Array.isArray(target?.transactions)
     ? target.transactions.map((tx) => ({
-        id: String(tx?.id || ''),
-        type: String(tx?.type || 'buy'),
-        assetName: String(tx?.assetName || ''),
-        symbol: String(tx?.symbol || ''),
-        quantity: Number(tx?.quantity || 0),
-        price: Number(tx?.price || 0),
-        total: Number(tx?.total || 0),
-        pnl: tx?.pnl !== undefined ? Number(tx.pnl) : undefined,
-        margin: tx?.margin !== undefined ? Number(tx.margin) : undefined,
-        time: String(tx?.time || ''),
-        instrumentType: String(tx?.instrumentType || 'stock'),
-      }))
+      id: String(tx?.id || ''),
+      type: String(tx?.type || 'buy'),
+      assetName: String(tx?.assetName || ''),
+      symbol: String(tx?.symbol || ''),
+      quantity: Number(tx?.quantity || 0),
+      price: Number(tx?.price || 0),
+      total: Number(tx?.total || 0),
+      pnl: tx?.pnl !== undefined ? Number(tx.pnl) : undefined,
+      margin: tx?.margin !== undefined ? Number(tx.margin) : undefined,
+      time: String(tx?.time || ''),
+      instrumentType: String(tx?.instrumentType || 'stock'),
+    }))
     : [];
 
   const normalizedPendingOrders = Array.isArray(target?.pendingOrders)
     ? target.pendingOrders.map((order) => ({
-        id: String(order?.id || ''),
-        assetId: String(order?.assetId || ''),
-        symbol: String(order?.symbol || ''),
-        name: String(order?.name || ''),
-        type: String(order?.type || 'crypto'),
-        quantity: Number(order?.quantity || 0),
-        limitPrice: Number(order?.limitPrice || 0),
-        instrumentType: String(order?.instrumentType || 'stock'),
-        direction: String(order?.direction || 'buy'),
-        futuresOptions: order?.futuresOptions ? {
-          direction: String(order.futuresOptions?.direction || 'long'),
-          leverage: Number(order.futuresOptions?.leverage || 1),
-          stopLoss: order.futuresOptions?.stopLoss ? Number(order.futuresOptions.stopLoss) : null,
-          takeProfit: order.futuresOptions?.takeProfit ? Number(order.futuresOptions.takeProfit) : null,
-          liquidationPrice: order.futuresOptions?.liquidationPrice ? Number(order.futuresOptions.liquidationPrice) : null,
-        } : null,
-        time: String(order?.time || ''),
-        createdAt: order?.createdAt ? Number(order.createdAt) : Date.now(),
-      }))
+      id: String(order?.id || ''),
+      assetId: String(order?.assetId || ''),
+      symbol: String(order?.symbol || ''),
+      name: String(order?.name || ''),
+      type: String(order?.type || 'crypto'),
+      quantity: Number(order?.quantity || 0),
+      limitPrice: Number(order?.limitPrice || 0),
+      instrumentType: String(order?.instrumentType || 'stock'),
+      direction: String(order?.direction || 'buy'),
+      futuresOptions: order?.futuresOptions ? {
+        direction: String(order.futuresOptions?.direction || 'long'),
+        leverage: Number(order.futuresOptions?.leverage || 1),
+        stopLoss: order.futuresOptions?.stopLoss ? Number(order.futuresOptions.stopLoss) : null,
+        takeProfit: order.futuresOptions?.takeProfit ? Number(order.futuresOptions.takeProfit) : null,
+        liquidationPrice: order.futuresOptions?.liquidationPrice ? Number(order.futuresOptions.liquidationPrice) : null,
+      } : null,
+      time: String(order?.time || ''),
+      createdAt: order?.createdAt ? Number(order.createdAt) : Date.now(),
+    }))
     : [];
 
   return {
@@ -529,7 +558,7 @@ function sendJson(res, req, statusCode, payload, extraHeaders = {}) {
   res.writeHead(statusCode, Object.assign({
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS,DELETE',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Credentials': 'true',
   }, extraHeaders));
@@ -548,7 +577,7 @@ const server = http.createServer(async (req, res) => {
     const origin = getOrigin(req);
     res.writeHead(204, {
       'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS,DELETE',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Allow-Credentials': 'true',
     });
@@ -606,6 +635,52 @@ const server = http.createServer(async (req, res) => {
     }
     return;
   }
+
+
+  if (requestUrl.pathname === '/api/reviews' && req.method === 'GET') {
+    try {
+      const rows = await statements.getReviews.getAll();
+      sendJson(res, req, 200, rows);
+    } catch (error) {
+      sendJson(res, req, 500, { error: 'Failed to fetch reviews' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/reviews' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const { id, userEmail, rating, text, date } = body || {};
+
+      if (!id || !userEmail || typeof rating !== 'number' || !text || !date) {
+        sendJson(res, req, 400, { error: 'Missing review fields' });
+        return;
+      }
+
+      await statements.insertReview.run(id, userEmail, rating, text, date);
+      sendJson(res, req, 201, { success: true });
+    } catch (error) {
+      sendJson(res, req, 500, { error: 'Failed to save review' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname.startsWith('/api/reviews/') && req.method === 'DELETE') {
+    try {
+      const id = requestUrl.pathname.split('/').pop();
+      if (!id) {
+        sendJson(res, req, 400, { error: 'Missing review ID' });
+        return;
+      }
+
+      await statements.deleteReview.run(id);
+      sendJson(res, req, 200, { success: true });
+    } catch (error) {
+      sendJson(res, req, 500, { error: 'Failed to delete review' });
+    }
+    return;
+  }
+
 
   if (requestUrl.pathname === '/api/register' && req.method === 'POST') {
     try {
@@ -771,11 +846,11 @@ async function shutdown(signal) {
 
   try {
     await new Promise((resolve) => server.close(() => resolve()));
-  } catch {}
+  } catch { }
 
   try {
     await pool.end();
-  } catch {}
+  } catch { }
 
   if (signal) {
     console.log(`Shutdown complete (${signal}).`);
