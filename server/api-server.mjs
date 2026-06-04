@@ -181,7 +181,7 @@ const statements = {
     run: async (id) => {
       await pool.execute('DELETE FROM reviews WHERE id = ?', [id]);
     }
-  }
+  },
 };
 
 const DEFAULT_PORTFOLIO = {
@@ -234,62 +234,62 @@ function normalizePortfolio(input) {
 
   const normalizedHoldings = Array.isArray(target?.holdings)
     ? target.holdings.map((holding) => ({
-      id: String(holding?.id || ''),
-      assetId: holding?.assetId ? String(holding.assetId) : String(holding?.id || ''),
-      symbol: String(holding?.symbol || ''),
-      name: String(holding?.name || ''),
-      quantity: Number(holding?.quantity || 0),
-      averagePrice: Number(holding?.averagePrice || 0),
-      currentPrice: Number(holding?.currentPrice || 0),
-      type: String(holding?.type || 'crypto'),
-      instrumentType: String(holding?.instrumentType || 'stock'),
-      direction: holding?.direction ? String(holding.direction) : null,
-      leverage: holding?.leverage ? Number(holding.leverage) : null,
-      margin: holding?.margin ? Number(holding.margin) : null,
-      stopLoss: holding?.stopLoss ? Number(holding.stopLoss) : null,
-      takeProfit: holding?.takeProfit ? Number(holding.takeProfit) : null,
-      liquidationPrice: holding?.liquidationPrice ? Number(holding.liquidationPrice) : null,
-      unrealizedPnL: holding?.unrealizedPnL ? Number(holding.unrealizedPnL) : 0,
-    }))
+        id: String(holding?.id || ''),
+        assetId: holding?.assetId ? String(holding.assetId) : String(holding?.id || ''),
+        symbol: String(holding?.symbol || ''),
+        name: String(holding?.name || ''),
+        quantity: Number(holding?.quantity || 0),
+        averagePrice: Number(holding?.averagePrice || 0),
+        currentPrice: Number(holding?.currentPrice || 0),
+        type: String(holding?.type || 'crypto'),
+        instrumentType: String(holding?.instrumentType || 'stock'),
+        direction: holding?.direction ? String(holding.direction) : null,
+        leverage: holding?.leverage ? Number(holding.leverage) : null,
+        margin: holding?.margin ? Number(holding.margin) : null,
+        stopLoss: holding?.stopLoss ? Number(holding.stopLoss) : null,
+        takeProfit: holding?.takeProfit ? Number(holding.takeProfit) : null,
+        liquidationPrice: holding?.liquidationPrice ? Number(holding.liquidationPrice) : null,
+        unrealizedPnL: holding?.unrealizedPnL ? Number(holding.unrealizedPnL) : 0,
+      }))
     : [];
 
   const normalizedTransactions = Array.isArray(target?.transactions)
     ? target.transactions.map((tx) => ({
-      id: String(tx?.id || ''),
-      type: String(tx?.type || 'buy'),
-      assetName: String(tx?.assetName || ''),
-      symbol: String(tx?.symbol || ''),
-      quantity: Number(tx?.quantity || 0),
-      price: Number(tx?.price || 0),
-      total: Number(tx?.total || 0),
-      pnl: tx?.pnl !== undefined ? Number(tx.pnl) : undefined,
-      margin: tx?.margin !== undefined ? Number(tx.margin) : undefined,
-      time: String(tx?.time || ''),
-      instrumentType: String(tx?.instrumentType || 'stock'),
-    }))
+        id: String(tx?.id || ''),
+        type: String(tx?.type || 'buy'),
+        assetName: String(tx?.assetName || ''),
+        symbol: String(tx?.symbol || ''),
+        quantity: Number(tx?.quantity || 0),
+        price: Number(tx?.price || 0),
+        total: Number(tx?.total || 0),
+        pnl: tx?.pnl !== undefined ? Number(tx.pnl) : undefined,
+        margin: tx?.margin !== undefined ? Number(tx.margin) : undefined,
+        time: String(tx?.time || ''),
+        instrumentType: String(tx?.instrumentType || 'stock'),
+      }))
     : [];
 
   const normalizedPendingOrders = Array.isArray(target?.pendingOrders)
     ? target.pendingOrders.map((order) => ({
-      id: String(order?.id || ''),
-      assetId: String(order?.assetId || ''),
-      symbol: String(order?.symbol || ''),
-      name: String(order?.name || ''),
-      type: String(order?.type || 'crypto'),
-      quantity: Number(order?.quantity || 0),
-      limitPrice: Number(order?.limitPrice || 0),
-      instrumentType: String(order?.instrumentType || 'stock'),
-      direction: String(order?.direction || 'buy'),
-      futuresOptions: order?.futuresOptions ? {
-        direction: String(order.futuresOptions?.direction || 'long'),
-        leverage: Number(order.futuresOptions?.leverage || 1),
-        stopLoss: order.futuresOptions?.stopLoss ? Number(order.futuresOptions.stopLoss) : null,
-        takeProfit: order.futuresOptions?.takeProfit ? Number(order.futuresOptions.takeProfit) : null,
-        liquidationPrice: order.futuresOptions?.liquidationPrice ? Number(order.futuresOptions.liquidationPrice) : null,
-      } : null,
-      time: String(order?.time || ''),
-      createdAt: order?.createdAt ? Number(order.createdAt) : Date.now(),
-    }))
+        id: String(order?.id || ''),
+        assetId: String(order?.assetId || ''),
+        symbol: String(order?.symbol || ''),
+        name: String(order?.name || ''),
+        type: String(order?.type || 'crypto'),
+        quantity: Number(order?.quantity || 0),
+        limitPrice: Number(order?.limitPrice || 0),
+        instrumentType: String(order?.instrumentType || 'stock'),
+        direction: String(order?.direction || 'buy'),
+        futuresOptions: order?.futuresOptions ? {
+          direction: String(order.futuresOptions?.direction || 'long'),
+          leverage: Number(order.futuresOptions?.leverage || 1),
+          stopLoss: order.futuresOptions?.stopLoss ? Number(order.futuresOptions.stopLoss) : null,
+          takeProfit: order.futuresOptions?.takeProfit ? Number(order.futuresOptions.takeProfit) : null,
+          liquidationPrice: order.futuresOptions?.liquidationPrice ? Number(order.futuresOptions.liquidationPrice) : null,
+        } : null,
+        time: String(order?.time || ''),
+        createdAt: order?.createdAt ? Number(order.createdAt) : Date.now(),
+      }))
     : [];
 
   return {
@@ -382,7 +382,7 @@ const STOCK_WATCHLIST = [
   { id: 'avgo', symbol: 'AVGO', name: 'Broadcom' },
   { id: 'cost', symbol: 'COST', name: 'Costco' },
   { id: 'nflx', symbol: 'NFLX', name: 'Netflix' },
-  { id: 'dis', stroke: 'DIS', name: 'Disney' },
+  { id: 'dis', symbol: 'DIS', name: 'Disney' },
   { id: 'ko', symbol: 'KO', name: 'Coca-Cola' },
   { id: 'pep', symbol: 'PEP', name: 'PepsiCo' },
   { id: 'orcl', symbol: 'ORCL', name: 'Oracle' },
@@ -391,7 +391,108 @@ const STOCK_WATCHLIST = [
   { id: 'qcom', symbol: 'QCOM', name: 'Qualcomm' },
 ];
 
-const STOCK_CACHE_TTL_MS = Number(process.env.STOCK_CACHE_TTL_MS) || 5000;
+
+const YAHOO_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Origin': 'https://finance.yahoo.com',
+  'Referer': 'https://finance.yahoo.com/',
+};
+
+async function fetchStockQuote(stock) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(stock.symbol)}?interval=1d&range=5d`;
+
+  let response = await fetch(url, { headers: YAHOO_HEADERS });
+
+  if (!response.ok) {
+    const url2 = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(stock.symbol)}?interval=1d&range=5d`;
+    response = await fetch(url2, { headers: YAHOO_HEADERS });
+  }
+
+  if (!response.ok) {
+    throw new Error(`Yahoo Finance quote failed for ${stock.symbol}: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const result = data?.chart?.result?.[0];
+  if (!result) throw new Error(`No quote data for ${stock.symbol}`);
+
+  const meta = result.meta;
+  const price = meta.regularMarketPrice ?? meta.previousClose ?? 0;
+  const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? price;
+  const change24h = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
+
+  return {
+    id: stock.id,
+    symbol: stock.symbol,
+    name: stock.name,
+    type: 'stock',
+    price: Number(price) || 0,
+    change24h: Number(change24h) || 0,
+    marketCapRank: 0,
+    source: 'yahoo',
+  };
+}
+
+async function fetchStockHistory(stock) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(stock.symbol)}?interval=1d&range=2y`;
+
+  let response = await fetch(url, { headers: YAHOO_HEADERS });
+
+  if (!response.ok) {
+    const url2 = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(stock.symbol)}?interval=1d&range=2y`;
+    response = await fetch(url2, { headers: YAHOO_HEADERS });
+  }
+
+  if (!response.ok) {
+    throw new Error(`Yahoo Finance history failed for ${stock.symbol}: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const result = data?.chart?.result?.[0];
+  if (!result) throw new Error(`No history data for ${stock.symbol}`);
+
+  const timestamps = result.timestamp ?? [];
+  const quote = result.indicators?.quote?.[0] ?? {};
+  const opens = quote.open ?? [];
+  const highs = quote.high ?? [];
+  const lows = quote.low ?? [];
+  const closes = quote.close ?? [];
+
+  const candles = timestamps
+    .map((t, i) => {
+      const open = Number(opens[i]);
+      const high = Number(highs[i]);
+      const low = Number(lows[i]);
+      const close = Number(closes[i]);
+
+      if (![open, high, low, close].every(Number.isFinite) || close <= 0) return null;
+
+      return {
+        t: t * 1000,
+        open,
+        high,
+        low,
+        close,
+      };
+    })
+    .filter(Boolean);
+
+  if (candles.length < 2) {
+    throw new Error(`Insufficient history for ${stock.symbol}`);
+  }
+
+  return {
+    id: stock.id,
+    symbol: stock.symbol,
+    name: stock.name,
+    type: 'stock',
+    candles,
+  };
+}
+
+const STOCK_CACHE_TTL_MS = Number(process.env.STOCK_CACHE_TTL_MS) || 1000;
 let cachedStocks = { updatedAtMs: 0, updatedAtIso: null, quotes: null };
 let stocksInFlight = null;
 
@@ -412,13 +513,14 @@ async function loadStockQuotesCached() {
         try {
           return await fetchStockQuote(stock);
         } catch (error) {
+          console.warn(`Stock quote error for ${stock.symbol}:`, error.message);
           return {
             id: stock.id,
             symbol: stock.symbol,
             name: stock.name,
             type: 'stock',
-            price: null,
-            change24h: null,
+            price: 0,
+            change24h: 0,
             marketCapRank: 0,
             source: 'error',
             error: error.message,
@@ -436,117 +538,6 @@ async function loadStockQuotesCached() {
 
   const result = await stocksInFlight;
   return { updatedAt: result.updatedAtIso, quotes: result.quotes };
-}
-
-function toNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function parseStooqCsv(text, fallbackSymbol, fallbackName) {
-  const row = text
-    .trim()
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find((line) => line && !line.toLowerCase().startsWith('symbol'));
-
-  if (!row) {
-    throw new Error(`No data returned for ${fallbackSymbol}`);
-  }
-
-  const [symbol, date, time, open, high, low, close, volume] = row.split(',');
-  const openPrice = toNumber(open);
-  const closePrice = toNumber(close);
-
-  return {
-    id: fallbackSymbol.toLowerCase(),
-    symbol: fallbackSymbol,
-    name: fallbackName,
-    type: 'stock',
-    price: closePrice ?? openPrice ?? 0,
-    change24h: openPrice && closePrice ? ((closePrice - openPrice) / openPrice) * 100 : 0,
-    marketCapRank: 0,
-    source: 'stooq',
-    quoteDate: date ?? null,
-    quoteTime: time ?? null,
-    volume: toNumber(volume),
-    upstreamSymbol: symbol ?? `${fallbackSymbol}.US`,
-    high: toNumber(high),
-    low: toNumber(low),
-    open: openPrice,
-  };
-}
-
-function parseStooqDailyHistoryCsv(text, fallbackSymbol, fallbackName) {
-  const rows = text
-    .trim()
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  if (rows.length < 2) {
-    throw new Error(`No history returned for ${fallbackSymbol}`);
-  }
-
-  const dataRows = rows.filter((line) => !line.toLowerCase().startsWith('date,'));
-  const candles = dataRows
-    .map((row) => {
-      const [date, open, high, low, close] = row.split(',');
-      const t = Date.parse(date);
-      const openPrice = toNumber(open);
-      const highPrice = toNumber(high);
-      const lowPrice = toNumber(low);
-      const closePrice = toNumber(close);
-
-      if (!Number.isFinite(t) || ![openPrice, highPrice, lowPrice, closePrice].every((v) => typeof v === 'number')) {
-        return null;
-      }
-
-      return {
-        t,
-        open: openPrice,
-        high: highPrice,
-        low: lowPrice,
-        close: closePrice,
-      };
-    })
-    .filter(Boolean);
-
-  if (candles.length < 2) {
-    throw new Error(`History parse failed for ${fallbackSymbol}`);
-  }
-
-  return {
-    id: fallbackSymbol.toLowerCase(),
-    symbol: fallbackSymbol,
-    name: fallbackName,
-    type: 'stock',
-    candles,
-  };
-}
-
-async function fetchStockHistory(stock) {
-  const url = `https://stooq.com/q/d/l/?s=${stock.symbol.toLowerCase()}.us&i=d`;
-  const response = await fetch(url, { headers: { accept: 'text/csv,*/*' } });
-
-  if (!response.ok) {
-    throw new Error(`Stooq history request failed for ${stock.symbol}`);
-  }
-
-  const text = await response.text();
-  return parseStooqDailyHistoryCsv(text, stock.symbol, stock.name);
-}
-
-async function fetchStockQuote(stock) {
-  const url = `https://stooq.com/q/l/?s=${stock.symbol.toLowerCase()}.us&f=sd2t2ohlcv&e=csv`;
-  const response = await fetch(url, { headers: { accept: 'text/csv,*/*' } });
-
-  if (!response.ok) {
-    throw new Error(`Stooq request failed for ${stock.symbol}`);
-  }
-
-  const text = await response.text();
-  return parseStooqCsv(text, stock.symbol, stock.name);
 }
 
 function getOrigin(req) {
@@ -598,7 +589,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const { quotes, updatedAt } = await loadStockQuotesCached();
       sendJson(res, req, 200, {
-        source: 'stooq-proxy',
+        source: 'yahoo-finance',
         updatedAt,
         quotes,
       });
@@ -636,7 +627,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-
   if (requestUrl.pathname === '/api/reviews' && req.method === 'GET') {
     try {
       const rows = await statements.getReviews.getAll();
@@ -672,7 +662,6 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, req, 400, { error: 'Missing review ID' });
         return;
       }
-
       await statements.deleteReview.run(id);
       sendJson(res, req, 200, { success: true });
     } catch (error) {
@@ -680,7 +669,6 @@ const server = http.createServer(async (req, res) => {
     }
     return;
   }
-
 
   if (requestUrl.pathname === '/api/register' && req.method === 'POST') {
     try {
@@ -846,11 +834,11 @@ async function shutdown(signal) {
 
   try {
     await new Promise((resolve) => server.close(() => resolve()));
-  } catch { }
+  } catch {}
 
   try {
     await pool.end();
-  } catch { }
+  } catch {}
 
   if (signal) {
     console.log(`Shutdown complete (${signal}).`);

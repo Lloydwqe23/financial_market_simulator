@@ -136,6 +136,7 @@ function ProfilePage() {
 
         <div className="profile-actions">
           <Link to="/portfolio" className="secondary-button">View portfolio</Link>
+          <Link to="/stats" className="secondary-button">Statistics</Link>
           <Link to="/reviews" className="secondary-button">Platform Reviews</Link>
           <Link to="/credits" className="secondary-button">Project Credits</Link>
           <button type="button" className="ghost-button" onClick={logout}>Sign out</button>
