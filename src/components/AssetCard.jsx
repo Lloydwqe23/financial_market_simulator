@@ -11,6 +11,17 @@ function AssetCard({ asset }) {
   const quoteCurrency = typeof asset?.quoteCurrency === 'string' ? asset.quoteCurrency : '';
   const isFxCard = asset?.type === 'currency' && quoteCurrency;
 
+  const volume = asset?.quoteVolume ?? asset?.volume ?? null;
+  const formattedVolume = volume != null && Number.isFinite(Number(volume))
+    ? Number(volume) >= 1_000_000_000
+      ? `$${(Number(volume) / 1_000_000_000).toFixed(2)}B`
+      : Number(volume) >= 1_000_000
+        ? `$${(Number(volume) / 1_000_000).toFixed(2)}M`
+        : Number(volume) >= 1_000
+          ? `$${(Number(volume) / 1_000).toFixed(2)}K`
+          : `$${Number(volume).toFixed(2)}`
+    : null;
+
   const openAsset = () => {
     const type = String(asset?.type || '').toLowerCase();
     const id = encodeURIComponent(String(asset?.id || ''));
@@ -51,6 +62,15 @@ function AssetCard({ asset }) {
             : `$${price.toLocaleString('en-US', { maximumFractionDigits: 2 })}`}
         </div>
       </div>
+
+      {formattedVolume && (
+        <div>
+          <div className="asset-meta">24h volume</div>
+          <div className="asset-meta" style={{ color: 'var(--text)', fontWeight: '600' }}>
+            {formattedVolume}
+          </div>
+        </div>
+      )}
 
       <button
         type="button"

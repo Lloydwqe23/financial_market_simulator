@@ -422,6 +422,7 @@ async function fetchStockQuote(stock) {
   const price = meta.regularMarketPrice ?? meta.previousClose ?? 0;
   const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? price;
   const change24h = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
+  const volume = meta.regularMarketVolume ?? 0;
 
   return {
     id: stock.id,
@@ -430,6 +431,7 @@ async function fetchStockQuote(stock) {
     type: 'stock',
     price: Number(price) || 0,
     change24h: Number(change24h) || 0,
+    volume: Number(volume) || 0,
     marketCapRank: 0,
     source: 'yahoo',
   };
