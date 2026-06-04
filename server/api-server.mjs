@@ -159,6 +159,7 @@ const DEFAULT_PORTFOLIO = {
   balance: 10000,
   holdings: [],
   transactions: [],
+  pendingOrders: [],
   lastMessage: 'Start by buying your first asset on the dashboard.',
 };
 
@@ -201,10 +202,11 @@ function hashPassword(password, salt = null) {
 function normalizePortfolio(input) {
   const target = input?.portfolio ? input.portfolio : input;
   const balance = Number(target?.balance);
-  
+
   const normalizedHoldings = Array.isArray(target?.holdings)
     ? target.holdings.map((holding) => ({
         id: String(holding?.id || ''),
+        assetId: holding?.assetId ? String(holding.assetId) : String(holding?.id || ''),
         symbol: String(holding?.symbol || ''),
         name: String(holding?.name || ''),
         quantity: Number(holding?.quantity || 0),
@@ -231,8 +233,33 @@ function normalizePortfolio(input) {
         quantity: Number(tx?.quantity || 0),
         price: Number(tx?.price || 0),
         total: Number(tx?.total || 0),
+        pnl: tx?.pnl !== undefined ? Number(tx.pnl) : undefined,
+        margin: tx?.margin !== undefined ? Number(tx.margin) : undefined,
         time: String(tx?.time || ''),
         instrumentType: String(tx?.instrumentType || 'stock'),
+      }))
+    : [];
+
+  const normalizedPendingOrders = Array.isArray(target?.pendingOrders)
+    ? target.pendingOrders.map((order) => ({
+        id: String(order?.id || ''),
+        assetId: String(order?.assetId || ''),
+        symbol: String(order?.symbol || ''),
+        name: String(order?.name || ''),
+        type: String(order?.type || 'crypto'),
+        quantity: Number(order?.quantity || 0),
+        limitPrice: Number(order?.limitPrice || 0),
+        instrumentType: String(order?.instrumentType || 'stock'),
+        direction: String(order?.direction || 'buy'),
+        futuresOptions: order?.futuresOptions ? {
+          direction: String(order.futuresOptions?.direction || 'long'),
+          leverage: Number(order.futuresOptions?.leverage || 1),
+          stopLoss: order.futuresOptions?.stopLoss ? Number(order.futuresOptions.stopLoss) : null,
+          takeProfit: order.futuresOptions?.takeProfit ? Number(order.futuresOptions.takeProfit) : null,
+          liquidationPrice: order.futuresOptions?.liquidationPrice ? Number(order.futuresOptions.liquidationPrice) : null,
+        } : null,
+        time: String(order?.time || ''),
+        createdAt: order?.createdAt ? Number(order.createdAt) : Date.now(),
       }))
     : [];
 
@@ -240,6 +267,7 @@ function normalizePortfolio(input) {
     balance: Number.isFinite(balance) ? balance : 10000,
     holdings: normalizedHoldings,
     transactions: normalizedTransactions,
+    pendingOrders: normalizedPendingOrders,
     lastMessage: typeof target?.lastMessage === 'string' ? target.lastMessage : 'Portfolio updated.',
   };
 }

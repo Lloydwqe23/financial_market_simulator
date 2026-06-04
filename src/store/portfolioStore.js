@@ -24,7 +24,6 @@ const usePortfolioStore = create((set, get) => ({
   pendingOrders: [],
   lastMessage: 'Start by buying your first asset on the dashboard.',
 
-  //DEPOSIT
   deposit: (amount) => {
     const n = Number(amount);
     if (!Number.isFinite(n) || n <= 0) return { ok: false };
@@ -67,7 +66,11 @@ const usePortfolioStore = create((set, get) => ({
 
     if (alreadyTriggered) {
       const state = get();
-      if (direction === 'buy') {
+      if (instrumentType === 'futures') {
+        const res = state.buyAsset({ asset, amount, instrumentType: 'futures', futuresOptions });
+        if (res.ok) set({ lastMessage: `Limit reached instantly! Executed at live market price of $${live.toFixed(2)}.` });
+        return res;
+      } else if (direction === 'buy') {
         const res = state.buyAsset({ asset, amount, instrumentType, futuresOptions });
         if (res.ok) set({ lastMessage: `Limit reached instantly! Executed at live market price of $${live.toFixed(2)}.` });
         return res;
@@ -79,14 +82,22 @@ const usePortfolioStore = create((set, get) => ({
     }
 
     const totalSize = quantity * targetPrice;
-    const marginCost = instrumentType === 'futures' ? totalSize / Number(futuresOptions?.leverage || 1) : totalSize;
+    const marginCost = instrumentType === 'futures'
+      ? totalSize / Number(futuresOptions?.leverage || 1)
+      : totalSize;
 
-    if (direction === 'buy' && marginCost > get().balance) {
-      set({ lastMessage: `Insufficient funds for limit order. Requires $${marginCost.toFixed(2)}.` });
-      return { ok: false };
-    }
-
-    if (direction === 'sell') {
+    // Futures always escrow margin (both long and short); spot only escrows on buy
+    if (instrumentType === 'futures') {
+      if (marginCost > get().balance) {
+        set({ lastMessage: `Insufficient funds for limit order. Requires $${marginCost.toFixed(2)}.` });
+        return { ok: false };
+      }
+    } else if (direction === 'buy') {
+      if (marginCost > get().balance) {
+        set({ lastMessage: `Insufficient funds for limit order. Requires $${marginCost.toFixed(2)}.` });
+        return { ok: false };
+      }
+    } else if (direction === 'sell') {
       const holding = get().holdings.find(h => h.id === asset.id && h.instrumentType === instrumentType);
       if (!holding || holding.quantity < quantity) {
         set({ lastMessage: `Not enough ${asset.symbol} to place sell limit order.` });
@@ -96,23 +107,42 @@ const usePortfolioStore = create((set, get) => ({
 
     set((state) => {
       const newOrder = {
-        id: crypto.randomUUID(), assetId: asset.id, symbol: asset.symbol, name: asset.name, type: asset.type,
-        quantity, limitPrice: targetPrice, instrumentType, direction, futuresOptions, time: new Date().toLocaleString('en-US')
+        id: crypto.randomUUID(),
+        assetId: asset.id,
+        symbol: asset.symbol,
+        name: asset.name,
+        type: asset.type,
+        quantity,
+        limitPrice: targetPrice,
+        instrumentType,
+        direction,
+        futuresOptions,
+        time: new Date().toLocaleString('en-US'),
       };
-      const newBalance = direction === 'buy' ? state.balance - marginCost : state.balance;
+
+      // Escrow margin for futures (both directions) and spot buys
+      const newBalance = (direction === 'buy' || instrumentType === 'futures')
+        ? state.balance - marginCost
+        : state.balance;
 
       return {
         balance: Number(newBalance.toFixed(2)),
         pendingOrders: [newOrder, ...state.pendingOrders],
         transactions: [
           {
-            id: crypto.randomUUID(), type: 'limit_placed', assetName: `Escrow: ${asset.name} Limit`,
-            symbol: asset.symbol, quantity, price: targetPrice, total: direction === 'buy' ? marginCost : 0,
-            time: new Date().toLocaleString('en-US'), instrumentType: instrumentType,
+            id: crypto.randomUUID(),
+            type: 'limit_placed',
+            assetName: `Escrow: ${asset.name}`,
+            symbol: asset.symbol,
+            quantity,
+            price: targetPrice,
+            total: (direction === 'buy' || instrumentType === 'futures') ? marginCost : 0,
+            time: new Date().toLocaleString('en-US'),
+            instrumentType,
           },
-          ...state.transactions
+          ...state.transactions,
         ],
-        lastMessage: `Limit ${direction.toUpperCase()} order placed for ${quantity} ${asset.symbol} at $${targetPrice.toFixed(2)}.`
+        lastMessage: `Limit ${direction.toUpperCase()} order placed for ${quantity} ${asset.symbol} at $${targetPrice.toFixed(2)}.`,
       };
     });
 
@@ -127,9 +157,13 @@ const usePortfolioStore = create((set, get) => ({
 
       let newBalance = state.balance;
       let marginCost = 0;
-      if (order.direction === 'buy') {
+
+      // Refund escrow for futures (both directions) and spot buys
+      if (order.direction === 'buy' || order.instrumentType === 'futures') {
         const totalSize = order.quantity * order.limitPrice;
-        marginCost = order.instrumentType === 'futures' ? totalSize / Number(order.futuresOptions?.leverage || 1) : totalSize;
+        marginCost = order.instrumentType === 'futures'
+          ? totalSize / Number(order.futuresOptions?.leverage || 1)
+          : totalSize;
         newBalance += marginCost;
       }
 
@@ -138,13 +172,19 @@ const usePortfolioStore = create((set, get) => ({
         pendingOrders: state.pendingOrders.filter(o => o.id !== orderId),
         transactions: [
           {
-            id: crypto.randomUUID(), type: 'limit_cancelled', assetName: `Refund: ${order.name} Limit`,
-            symbol: order.symbol, quantity: order.quantity, price: order.limitPrice, total: order.direction === 'buy' ? marginCost : 0,
-            time: new Date().toLocaleString('en-US'), instrumentType: order.instrumentType,
+            id: crypto.randomUUID(),
+            type: 'limit_cancelled',
+            assetName: `Refund: ${order.name}`,
+            symbol: order.symbol,
+            quantity: order.quantity,
+            price: order.limitPrice,
+            total: (order.direction === 'buy' || order.instrumentType === 'futures') ? marginCost : 0,
+            time: new Date().toLocaleString('en-US'),
+            instrumentType: order.instrumentType,
           },
-          ...state.transactions
+          ...state.transactions,
         ],
-        lastMessage: `Cancelled limit order for ${order.symbol}.`
+        lastMessage: `Cancelled limit order for ${order.symbol}.`,
       };
     });
     setTimeout(() => persistToServer(get), 0);
@@ -192,13 +232,14 @@ const usePortfolioStore = create((set, get) => ({
         } else {
           holdings.push({
             id: asset.id,
+            assetId: asset.id,
             symbol: asset.symbol,
             name: asset.name,
             quantity,
             averagePrice: assetPrice,
             currentPrice: assetPrice,
             type: asset.type,
-            instrumentType: instrumentType,
+            instrumentType,
           });
         }
         return {
@@ -214,7 +255,7 @@ const usePortfolioStore = create((set, get) => ({
               price: assetPrice,
               total: totalSize,
               time: new Date().toLocaleString('en-US'),
-              instrumentType: instrumentType,
+              instrumentType,
             },
             ...state.transactions,
           ],
@@ -222,7 +263,6 @@ const usePortfolioStore = create((set, get) => ({
             ? `Staked ${quantity} ${asset.symbol.toUpperCase()} into the Earn Wallet for $${totalSize.toFixed(2)}.`
             : `Bought ${quantity} ${asset.symbol.toUpperCase()} on Spot for $${totalSize.toFixed(2)}.`,
         };
-
       } else {
         holdings.push({
           id: `${asset.id}-futures-${crypto.randomUUID().slice(0, 4)}`,
@@ -314,7 +354,7 @@ const usePortfolioStore = create((set, get) => ({
             price: assetPrice,
             total: totalGain,
             time: new Date().toLocaleString('en-US'),
-            instrumentType: instrumentType,
+            instrumentType,
           },
           ...state.transactions,
         ],
@@ -331,7 +371,9 @@ const usePortfolioStore = create((set, get) => ({
     return { ok: true };
   },
 
-  syncMarketPrices: (marketAssets) =>
+  syncMarketPrices: (marketAssets) => {
+    const persistAfter = { should: false };
+
     set((state) => {
       let updatedBalance = state.balance;
       let transactions = [...state.transactions];
@@ -344,14 +386,17 @@ const usePortfolioStore = create((set, get) => ({
         if (!found) return true;
         const livePrice = Number(found.price);
 
-        const triggered = (order.direction === 'buy' && livePrice <= order.limitPrice) ||
-          (order.direction === 'sell' && livePrice >= order.limitPrice);
+        const orderAge = order.createdAt ? Date.now() - order.createdAt : 10000;
+        const triggered =
+          orderAge > 3000 &&
+          ((order.direction === 'buy' && livePrice <= order.limitPrice) ||
+            (order.direction === 'sell' && livePrice >= order.limitPrice));
 
         if (triggered) {
           const totalSize = order.quantity * order.limitPrice;
 
-          if (order.direction === 'buy') {
-            if (order.instrumentType === 'stock' || order.instrumentType === 'earn') {
+          if (order.instrumentType === 'stock' || order.instrumentType === 'earn') {
+            if (order.direction === 'buy') {
               const idx = holdings.findIndex(h => h.id === order.assetId && h.instrumentType === order.instrumentType);
               if (idx > -1) {
                 const ex = holdings[idx];
@@ -363,36 +408,66 @@ const usePortfolioStore = create((set, get) => ({
                 };
               } else {
                 holdings.push({
-                  id: order.assetId, symbol: order.symbol, name: order.name, quantity: order.quantity,
-                  averagePrice: order.limitPrice, currentPrice: livePrice, type: order.type, instrumentType: order.instrumentType,
+                  id: order.assetId,
+                  assetId: order.assetId,
+                  symbol: order.symbol,
+                  name: order.name,
+                  quantity: order.quantity,
+                  averagePrice: order.limitPrice,
+                  currentPrice: livePrice,
+                  type: order.type,
+                  instrumentType: order.instrumentType,
                 });
               }
-            } else if (order.instrumentType === 'futures') {
-              const marginCost = totalSize / Number(order.futuresOptions?.leverage || 1);
-              holdings.push({
-                id: `${order.assetId}-futures-${crypto.randomUUID().slice(0, 4)}`,
-                assetId: order.assetId, symbol: order.symbol, name: order.name, quantity: order.quantity,
-                averagePrice: order.limitPrice, currentPrice: livePrice, type: order.type, instrumentType: 'futures',
-                direction: order.futuresOptions?.direction || 'long', leverage: Number(order.futuresOptions?.leverage || 1),
-                margin: marginCost, stopLoss: order.futuresOptions?.stopLoss || null, takeProfit: order.futuresOptions?.takeProfit || null,
-                liquidationPrice: order.futuresOptions?.liquidationPrice || 0, unrealizedPnL: 0,
-              });
+            } else {
+              const idx = holdings.findIndex(h => h.id === order.assetId && h.instrumentType === order.instrumentType);
+              if (idx > -1) {
+                holdings[idx] = {
+                  ...holdings[idx],
+                  quantity: Number((holdings[idx].quantity - order.quantity).toFixed(8)),
+                };
+                updatedBalance += totalSize;
+              }
+              holdings = holdings.filter(h => h.quantity > 0);
             }
-          } else if (order.direction === 'sell') {
-            const idx = holdings.findIndex(h => h.id === order.assetId && h.instrumentType === order.instrumentType);
-            if (idx > -1) {
-              holdings[idx].quantity = Number((holdings[idx].quantity - order.quantity).toFixed(8));
-              updatedBalance += totalSize;
-            }
-            holdings = holdings.filter(h => h.quantity > 0);
+          } else if (order.instrumentType === 'futures') {
+            const marginCost = totalSize / Number(order.futuresOptions?.leverage || 1);
+            const futuresDirection = order.futuresOptions?.direction || (order.direction === 'buy' ? 'long' : 'short');
+            holdings.push({
+              id: `${order.assetId}-futures-${crypto.randomUUID().slice(0, 4)}`,
+              assetId: order.assetId,
+              symbol: order.symbol,
+              name: order.name,
+              quantity: order.quantity,
+              averagePrice: order.limitPrice,
+              currentPrice: livePrice,
+              type: order.type,
+              instrumentType: 'futures',
+              direction: futuresDirection,
+              leverage: Number(order.futuresOptions?.leverage || 1),
+              margin: marginCost,
+              stopLoss: order.futuresOptions?.stopLoss || null,
+              takeProfit: order.futuresOptions?.takeProfit || null,
+              liquidationPrice: order.futuresOptions?.liquidationPrice || 0,
+              unrealizedPnL: 0,
+            });
           }
 
           transactions.unshift({
-            id: crypto.randomUUID(), type: order.direction, assetName: `${order.name} (Limit)`,
-            symbol: order.symbol, quantity: order.quantity, price: order.limitPrice, total: totalSize,
-            time: new Date().toLocaleTimeString(), instrumentType: order.instrumentType,
+            id: crypto.randomUUID(),
+            type: order.instrumentType === 'futures' ? 'buy' : order.direction,
+            assetName: `${order.name} (Limit)`,
+            symbol: order.symbol,
+            quantity: order.quantity,
+            price: order.limitPrice,
+            total: order.instrumentType === 'futures'
+              ? totalSize / Number(order.futuresOptions?.leverage || 1)
+              : totalSize,
+            time: new Date().toLocaleTimeString(),
+            instrumentType: order.instrumentType,
           });
 
+          persistAfter.should = true;
           logs.push(`Limit ${order.direction} filled for ${order.quantity} ${order.symbol} at $${order.limitPrice.toFixed(2)}.`);
           return false;
         }
@@ -425,12 +500,15 @@ const usePortfolioStore = create((set, get) => ({
 
         let triggered = false;
         let reason = '';
+
         if (holding.direction === 'long' && nextPrice <= holding.liquidationPrice) { triggered = true; reason = 'Liquidation'; }
         if (holding.direction === 'short' && nextPrice >= holding.liquidationPrice) { triggered = true; reason = 'Liquidation'; }
+
         if (!triggered && holding.stopLoss) {
           if (holding.direction === 'long' && nextPrice <= holding.stopLoss) { triggered = true; reason = 'Stop Loss'; }
           if (holding.direction === 'short' && nextPrice >= holding.stopLoss) { triggered = true; reason = 'Stop Loss'; }
         }
+
         if (!triggered && holding.takeProfit) {
           if (holding.direction === 'long' && nextPrice >= holding.takeProfit) { triggered = true; reason = 'Take Profit'; }
           if (holding.direction === 'short' && nextPrice <= holding.takeProfit) { triggered = true; reason = 'Take Profit'; }
@@ -440,15 +518,21 @@ const usePortfolioStore = create((set, get) => ({
           const finalPayout = Math.max(0, reason === 'Liquidation' ? 0 : holding.margin + unrealizedPnL);
           updatedBalance = Number((updatedBalance + finalPayout).toFixed(2));
           transactions.unshift({
-            id: crypto.randomUUID(), type: 'futures_close', assetName: `${holding.name} (${reason})`,
-            symbol: holding.symbol, quantity: holding.quantity, price: nextPrice,
+            id: crypto.randomUUID(),
+            type: 'futures_close',
+            assetName: `${holding.name} (${reason})`,
+            symbol: holding.symbol,
+            quantity: holding.quantity,
+            price: nextPrice,
             total: finalPayout,
             pnl: unrealizedPnL,
             margin: holding.margin,
-            time: new Date().toLocaleTimeString(), instrumentType: 'futures',
+            time: new Date().toLocaleTimeString(),
+            instrumentType: 'futures',
           });
           const sign = unrealizedPnL >= 0 ? 'won' : 'lost';
           logs.push(`Closed ${holding.symbol.toUpperCase()} Futures via ${reason}! You ${sign} $${Math.abs(unrealizedPnL).toFixed(2)}.`);
+          persistAfter.should = true;
           return null;
         }
 
@@ -462,29 +546,11 @@ const usePortfolioStore = create((set, get) => ({
         transactions,
         ...(logs.length > 0 ? { lastMessage: logs[0] } : {}),
       };
-    }),
-
-  updatePositionTriggers: ({ positionId, stopLoss, takeProfit }) => {
-    set((state) => {
-      const holdings = state.holdings.map((item) => {
-        if (item.id === positionId) {
-          return {
-            ...item,
-            stopLoss: stopLoss ? Number(stopLoss) : null,
-            takeProfit: takeProfit ? Number(takeProfit) : null,
-          };
-        }
-        return item;
-      });
-
-      return {
-        holdings,
-        lastMessage: `Updated risk thresholds for position contract.`,
-      };
     });
 
-    setTimeout(() => persistToServer(get), 0);
-    return { ok: true };
+    if (persistAfter.should) {
+      setTimeout(() => persistToServer(get), 0);
+    }
   },
 
   fetchFromServer: async () => {

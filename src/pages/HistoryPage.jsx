@@ -79,7 +79,7 @@ function HistoryPage() {
                         Futures Contracts
                     </button>
                     <button className={`tf-pill ${filter === 'limit' ? 'tf-pill--active' : ''}`} onClick={() => setFilter('limit')} style={{ borderColor: filter === 'limit' ? 'rgba(168, 85, 247, 0.5)' : '', color: filter === 'limit' ? '#d8b4fe' : '' }}>
-                        Limit Orders & Escrow
+                        Limit Orders
                     </button>
                 </div>
 
@@ -115,7 +115,7 @@ function HistoryPage() {
                                         </strong>
                                         {transaction.instrumentType === 'futures' && <span className="auth-pill" style={{ fontSize: '0.65rem', padding: '2px 8px', background: 'rgba(66, 211, 146, 0.1)' }}>(futures)</span>}
                                         {transaction.instrumentType === 'earn' && <span className="auth-pill" style={{ fontSize: '0.65rem', padding: '2px 8px', background: 'rgba(247, 185, 85, 0.1)', color: 'var(--auth-accent)' }}>(earn)</span>}
-                                        {transaction.type.includes('limit') && !transaction.type.includes('filled') && <span className="auth-pill" style={{ fontSize: '0.65rem', padding: '2px 8px', background: 'rgba(168, 85, 247, 0.1)', color: '#d8b4fe' }}>(escrow)</span>}
+                                        {transaction.type.includes('limit') && !transaction.type.includes('filled') && <span className="auth-pill" style={{ fontSize: '0.65rem', padding: '2px 8px', background: 'rgba(168, 85, 247, 0.1)', color: '#d8b4fe' }}>(limit orders)</span>}
                                     </div>
 
                                     <div className="asset-meta" style={{ flex: '2', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', padding: '0 32px' }}>
