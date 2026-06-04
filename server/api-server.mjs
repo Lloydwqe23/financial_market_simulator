@@ -50,6 +50,7 @@ async function ensureMySqlSchema() {
       email VARCHAR(320) NOT NULL,
       salt VARCHAR(64) NOT NULL,
       hash VARCHAR(64) NOT NULL,
+      display_name VARCHAR(100) DEFAULT NULL,
       created_at BIGINT NOT NULL,
       PRIMARY KEY (id),
       UNIQUE KEY uniq_users_email (email)
@@ -94,7 +95,7 @@ const statements = {
   getUserByEmail: {
     get: async (email) => {
       const [rows] = await pool.execute(
-        'SELECT id, email, salt, hash, created_at FROM users WHERE email = ? LIMIT 1',
+        'SELECT id, email, salt, hash, display_name, created_at FROM users WHERE email = ? LIMIT 1',
         [email],
       );
       return rows[0];
@@ -141,6 +142,14 @@ const statements = {
          VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE data = VALUES(data), updated_at = VALUES(updated_at)`,
         [user_id, data, updated_at],
+      );
+    },
+  },
+  updateUserDisplayName: {
+    run: async (userId, displayName) => {
+      await pool.execute(
+        'UPDATE users SET display_name = ? WHERE id = ?',
+        [displayName, userId]
       );
     },
   },
@@ -316,7 +325,7 @@ const STOCK_WATCHLIST = [
   { id: 'avgo', symbol: 'AVGO', name: 'Broadcom' },
   { id: 'cost', symbol: 'COST', name: 'Costco' },
   { id: 'nflx', symbol: 'NFLX', name: 'Netflix' },
-  { id: 'dis', symbol: 'DIS', name: 'Disney' },
+  { id: 'dis', stroke: 'DIS', name: 'Disney' },
   { id: 'ko', symbol: 'KO', name: 'Coca-Cola' },
   { id: 'pep', symbol: 'PEP', name: 'PepsiCo' },
   { id: 'orcl', symbol: 'ORCL', name: 'Oracle' },
@@ -654,8 +663,10 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, req, 401, { error: 'not authenticated' });
         return;
       }
+      const [rows] = await pool.execute('SELECT display_name FROM users WHERE id = ? LIMIT 1', [session.userId]);
+      const savedName = rows[0]?.display_name || null;
       const portfolio = await loadPortfolio(session.userId);
-      sendJson(res, req, 200, { email: session.email, userId: session.userId, portfolio });
+      sendJson(res, req, 200, { email: session.email, userId: session.userId, displayName: savedName, portfolio });
     } catch (e) {
       sendJson(res, req, 500, { error: e.message });
     }
@@ -687,6 +698,27 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const saved = await savePortfolio(session.userId, body);
       sendJson(res, req, 200, { portfolio: saved });
+    } catch (e) {
+      sendJson(res, req, 500, { error: e.message });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/user/update-name' && req.method === 'POST') {
+    try {
+      const session = await getSessionFromRequest(req);
+      if (!session) {
+        sendJson(res, req, 401, { error: 'not authenticated' });
+        return;
+      }
+      const body = await readJsonBody(req);
+      const { displayName } = body || {};
+      if (!displayName || !displayName.trim()) {
+        sendJson(res, req, 400, { error: 'Name cannot be empty' });
+        return;
+      }
+      await statements.updateUserDisplayName.run(session.userId, displayName.trim());
+      sendJson(res, req, 200, { ok: true, displayName: displayName.trim() });
     } catch (e) {
       sendJson(res, req, 500, { error: e.message });
     }

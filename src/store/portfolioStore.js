@@ -441,7 +441,10 @@ const usePortfolioStore = create((set, get) => ({
           updatedBalance = Number((updatedBalance + finalPayout).toFixed(2));
           transactions.unshift({
             id: crypto.randomUUID(), type: 'futures_close', assetName: `${holding.name} (${reason})`,
-            symbol: holding.symbol, quantity: holding.quantity, price: nextPrice, total: unrealizedPnL,
+            symbol: holding.symbol, quantity: holding.quantity, price: nextPrice,
+            total: finalPayout,
+            pnl: unrealizedPnL,
+            margin: holding.margin,
             time: new Date().toLocaleTimeString(), instrumentType: 'futures',
           });
           const sign = unrealizedPnL >= 0 ? 'won' : 'lost';

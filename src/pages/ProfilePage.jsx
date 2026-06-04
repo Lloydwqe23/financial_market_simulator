@@ -7,6 +7,7 @@ const PRESET_AMOUNTS = [500, 1000, 5000, 10000];
 
 function ProfilePage() {
   const user = useAuthStore((s) => s.user);
+  const updateDisplayName = useAuthStore((s) => s.updateDisplayName);
   const logout = useAuthStore((s) => s.logout);
   const balance = usePortfolioStore((s) => s.balance);
   const holdings = usePortfolioStore((s) => s.holdings);
@@ -16,11 +17,20 @@ function ProfilePage() {
   const [depositInput, setDepositInput] = useState('');
   const [depositMsg, setDepositMsg] = useState(null);
 
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+
   const portfolioValue = useMemo(
     () => holdings.reduce((sum, h) => sum + h.quantity * h.currentPrice, 0),
     [holdings],
   );
   const totalWorth = balance + portfolioValue;
+
+  const derivedName = useMemo(() => {
+    if (!user?.email) return 'User';
+    if (user.displayName) return user.displayName;
+    return user.email.split('@')[0];
+  }, [user]);
 
   const handleDeposit = (amount) => {
     const n = Number(amount);
@@ -35,6 +45,18 @@ function ProfilePage() {
     deposit(n);
     setDepositMsg({ ok: true, text: `+$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })} added to your balance.` });
     setDepositInput('');
+  };
+
+  const startEditingName = () => {
+    setNameInput(derivedName);
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = () => {
+    if (nameInput.trim()) {
+      updateDisplayName(nameInput);
+    }
+    setIsEditingName(false);
   };
 
   if (!user) {
@@ -53,7 +75,7 @@ function ProfilePage() {
     );
   }
 
-  const initial = user.email?.[0]?.toUpperCase() ?? 'U';
+  const initial = derivedName[0]?.toUpperCase() ?? 'U';
 
   return (
     <section className="page-grid">
@@ -61,9 +83,35 @@ function ProfilePage() {
       <div className="surface profile-card">
         <div className="profile-header">
           <div className="profile-avatar">{initial}</div>
-          <div>
-            <h2>{user.email}</h2>
-            <p className="profile-meta">Demo trader</p>
+          <div style={{ flex: 1 }}>
+            {isEditingName ? (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  className="market-search-input"
+                  style={{ padding: '6px 12px', fontSize: '1.2rem', fontWeight: 'bold' }}
+                  value={nameInput}
+                  maxLength={25}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                />
+                <button type="button" className="primary-button" style={{ padding: '8px 14px' }} onClick={handleSaveName}>
+                  Save
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h2 style={{ margin: 0 }}>{derivedName}</h2>
+                <button 
+                  type="button" 
+                  className="tf-pill" 
+                  style={{ fontSize: '0.7rem', padding: '3px 8px', margin: 0 }} 
+                  onClick={startEditingName}
+                >
+                  ✏️ Edit
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -88,8 +136,7 @@ function ProfilePage() {
 
         <div className="profile-actions">
           <Link to="/portfolio" className="secondary-button">View portfolio</Link>
-          <Link to="/stats" className="secondary-button">Stastistics</Link>
-          <Link to="/reviews" className="secondary-button">Platform Reviews</Link>
+          <Link to="/stats" className="secondary-button">Statistics</Link>
           <Link to="/credits" className="secondary-button">Project Credits</Link>
           <button type="button" className="ghost-button" onClick={logout}>Sign out</button>
         </div>

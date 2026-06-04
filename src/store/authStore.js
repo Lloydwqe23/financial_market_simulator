@@ -114,33 +114,45 @@ export const useAuthStore = create((set, get) => ({
       lastMessage: 'Start by buying your first asset on the dashboard.',
     });
   },
+
   whoami: async () => {
-    set({ loading: true, error: null });
     try {
       const res = await fetch('/api/me', { credentials: 'include' });
-      if (!res.ok) {
-        writeStoredAuth(null, null);
-        set({ loading: false, user: null, token: null });
-        return null;
-      }
-      const data = await res.json();
-      const user = { email: data.email };
-      const token = get().token;
-      writeStoredAuth(user, token);
-      if (data.portfolio) {
-        usePortfolioStore.setState({
-          balance: data.portfolio.balance,
-          holdings: data.portfolio.holdings,
-          transactions: data.portfolio.transactions,
-          lastMessage: data.portfolio.lastMessage,
+      if (res.ok) {
+        const data = await res.json();
+        set({
+          user: {
+            email: data.email,
+            id: data.userId,
+            displayName: data.displayName // Loads the database value on boot
+          }
         });
       }
-      set({ loading: false, user });
-      return data.email;
-    } catch (e) {
-      writeStoredAuth(null, null);
-      set({ loading: false, user: null });
-      return null;
+    } catch (_) {}
+  },
+
+  updateDisplayName: async (newName) => {
+    try {
+      const res = await fetch('/api/user/update-name', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: newName })
+      });
+
+      if (res.ok) {
+        set((state) => {
+          if (!state.user) return state;
+          return {
+            user: {
+              ...state.user,
+              displayName: newName.trim()
+            }
+          };
+        });
+      }
+    } catch (err) {
+      console.error('Failed to persist custom username to database:', err);
     }
   },
 }));

@@ -150,7 +150,7 @@ function CurrencyPage() {
         </div>
 
         <div className="hero-meta-row">
-          <span className="asset-meta">Status: {status}</span>
+          <span className="asset-meta">Time: {status}</span>
           <span className="asset-meta">•</span>
           <span className="asset-meta">
             1 {selectedBase} ≈ {usdAnchor === null ? '...' : `${Number(usdAnchor).toFixed(4)} USD`}

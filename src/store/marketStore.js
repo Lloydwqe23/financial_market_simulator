@@ -82,7 +82,7 @@ const useMarketStore = create((set, get) => ({
 
       set({
         cryptoAssets,
-        cryptoStatus: `Binance • ${new Date().toLocaleTimeString('en-US')}`,
+        cryptoStatus: `${new Date().toLocaleTimeString('en-US')}`,
         cryptoReady: true,
       });
     } catch (liveError) {
@@ -109,7 +109,7 @@ const useMarketStore = create((set, get) => ({
 
       set({
         stockAssets,
-        stockStatus: `Stooq proxy • all symbols moving • ${new Date().toLocaleTimeString('en-US')}`,
+        stockStatus: `${new Date().toLocaleTimeString('en-US')}`,
         stockReady: true,
       });
     } catch (error) {
@@ -156,7 +156,7 @@ const useMarketStore = create((set, get) => ({
         currencyRates: normalizedRates,
         currencyPrevRates: previousRates,
         currencyChanges: previousBase === baseCurrency ? buildCurrencyChanges(previousRates, normalizedRates) : {},
-        currencyStatus: `Currency API • ${new Date().toLocaleTimeString('en-US')}`,
+        currencyStatus: `${new Date().toLocaleTimeString('en-US')}`,
         currencyReady: true,
       });
     } catch (error) {

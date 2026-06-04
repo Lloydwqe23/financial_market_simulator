@@ -83,7 +83,7 @@ function CryptoPage() {
         </div>
 
         <div className="hero-meta-row">
-          <span className="asset-meta">Status: {status}</span>
+          <span className="asset-meta">Time: {status}</span>
           <span className="asset-meta">•</span>
           <span className="asset-meta">Average change: {marketSummary}%</span>
           <span className="asset-meta">•</span>
