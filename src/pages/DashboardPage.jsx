@@ -129,7 +129,7 @@ function DashboardPage() {
         <div className="hero">
           <h2>Market dashboard</h2>
           <p>Live crypto and stock quotes updated every second through public APIs.</p>
-          <p className="asset-meta">Status: {status}</p>
+          <p className="asset-meta">Time: {status}</p>
           <p className="asset-meta">Average market change: {marketSummary}%</p>
           <p className="asset-meta">Assets tracked: {assets.length}</p>
         </div>

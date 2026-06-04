@@ -17,22 +17,35 @@ function StatsPage() {
         };
 
         transactions.forEach(t => {
-            const absValue = Math.abs(t.total);
-            const isNeutral = t.type.includes('limit_filled');
+        const isNeutral = t.type.includes('limit_filled');
+        if (isNeutral) return;
 
-            if (!isNeutral) {
-                totalVolume += absValue;
+        const category = breakdown[t.instrumentType] ? t.instrumentType : 'stock';
 
-                const category = breakdown[t.instrumentType] ? t.instrumentType : 'stock';
+        if (t.type === 'buy' || t.type === 'limit_placed') {
+            const cost = Math.abs(t.total);
+            totalVolume += cost;
+            breakdown[category].volume += cost;
+            breakdown[category].invested += cost;
 
-                breakdown[category].volume += absValue;
-
-                if (t.type === 'buy' || t.type === 'limit_placed' || (t.type === 'futures_close' && t.total < 0)) {
-                    breakdown[category].invested += absValue;
-                } else {
-                    breakdown[category].realized += absValue;
-                }
+        } else if (t.type === 'futures_close') {
+            if (t.margin !== undefined) {
+            const payout = Math.max(0, t.margin + (t.pnl ?? t.total));
+            totalVolume += payout;
+            breakdown[category].volume += payout;
+            breakdown[category].realized += payout;
+            } else {
+            if (t.total > 0) {
+                breakdown[category].realized += t.total;
             }
+            }
+
+        } else {
+            const val = Math.abs(t.total);
+            totalVolume += val;
+            breakdown[category].volume += val;
+            breakdown[category].realized += val;
+        }
         });
 
         return { totalVolume, breakdown };

@@ -90,12 +90,14 @@ function HistoryPage() {
                         {filteredTransactions.map((transaction) => {
                             let isOutflow = false;
                             let isNeutral = false;
-                            let absoluteValue = Math.abs(transaction.total);
+                            let absoluteValue = (transaction.type === 'futures_close' && transaction.pnl !== undefined)
+                            ? Math.abs(transaction.pnl)
+                            : Math.abs(transaction.total);
 
                             if (transaction.type === 'buy' || transaction.type === 'limit_placed') {
                                 isOutflow = true;
                             } else if (transaction.type === 'futures_close') {
-                                isOutflow = transaction.total < 0;
+                                isOutflow = (transaction.pnl ?? transaction.total) < 0;
                             } else if (transaction.type === 'limit_filled_buy') {
                                 isNeutral = true;
                             }
