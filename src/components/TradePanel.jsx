@@ -72,7 +72,8 @@ function TradePanel({ asset, onClose, onBuy, onSell, balance, quoteCurrency }) {
       };
 
       if (isLimit) {
-        placeLimitOrder({ asset, amount: amountNumber, instrumentType: 'futures', limitPrice, direction: actionType, futuresOptions: fOpts, currentLivePrice: assetPrice });
+        const futuresLimitDirection = direction === 'long' ? 'buy' : 'sell';
+        placeLimitOrder({ asset, amount: amountNumber, instrumentType: 'futures', limitPrice, direction: futuresLimitDirection, futuresOptions: fOpts, currentLivePrice: assetPrice });
       } else {
         onBuy(amountNumber, 'futures', fOpts);
       }
